@@ -11,7 +11,13 @@ const elements = {
   modePicker: document.querySelector("#modePicker"),
   openActions: document.querySelector("#openActions"),
   openBook: document.querySelector("#openBook"),
+  pageNavigator: document.querySelector("#pageNavigator"),
   pageNumber: document.querySelector("#pageNumber"),
+  pageTrack: document.querySelector("#pageTrack"),
+  pageTrackFill: document.querySelector("#pageTrackFill"),
+  pageTrackInstruction: document.querySelector("#pageTrackInstruction"),
+  pageTrackPreview: document.querySelector("#pageTrackPreview"),
+  pageTrackThumb: document.querySelector("#pageTrackThumb"),
   questionCopy: document.querySelector("#questionCopy"),
   randomMode: document.querySelector("#randomMode"),
   againButton: document.querySelector("#againButton"),
@@ -37,16 +43,14 @@ const state = {
   currentIndex: 0,
   mode: null,
   modePickerOpen: false,
-  pointerId: null,
-  pointerStartX: 0,
-  pointerLastX: 0,
-  pointerLastTime: 0,
-  pointerVelocity: 0,
   flipDirection: 0,
   flipProgress: 0,
   flipTargetIndex: 0,
   isAnimating: false,
   isOpen: false,
+  navigationToken: 0,
+  scrubPointerId: null,
+  scrubTargetIndex: 0,
   soundEnabled: true
 };
 
@@ -136,9 +140,9 @@ function setFlipTransform(progress, duration = 0) {
   state.flipProgress = clampedProgress;
 }
 
-function prepareFlip(direction) {
+function prepareFlip(direction, targetIndex = state.currentIndex + direction) {
   state.flipDirection = direction;
-  state.flipTargetIndex = normalizedIndex(state.currentIndex + direction);
+  state.flipTargetIndex = normalizedIndex(targetIndex);
   elements.turningSheet.dataset.direction =
     direction > 0 ? "forward" : "backward";
 
@@ -173,46 +177,193 @@ function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function animatePreparedFlip(complete, duration) {
+async function animatePreparedFlip(complete, duration, { quiet = false } = {}) {
   setFlipTransform(complete ? 1 : 0, duration);
   await wait(duration + 24);
 
   if (complete) {
     state.currentIndex = state.flipTargetIndex;
     paintMainAnswer(state.currentIndex);
-    playPageSound();
-    vibrate(5);
+    if (!quiet) {
+      playPageSound();
+      vibrate(5);
+    }
   }
 
   resetFlip({ restoreCurrent: !complete });
 }
 
-async function runAutomaticFlip(direction) {
-  prepareFlip(direction);
+async function runAutomaticFlip(
+  direction,
+  targetIndex = state.currentIndex + direction,
+  duration = 390,
+  { quiet = false } = {}
+) {
+  prepareFlip(direction, targetIndex);
   await wait(32);
-  await animatePreparedFlip(true, 390);
+  await animatePreparedFlip(true, duration, { quiet });
 }
 
-async function settleFlip(complete, extraPages = 0) {
-  if (!state.flipDirection || state.isAnimating) return;
-  state.isAnimating = true;
-  const direction = state.flipDirection;
-  const remaining = complete
-    ? 1 - state.flipProgress
-    : state.flipProgress;
-  const duration = Math.max(170, Math.round(430 * remaining));
+function updateNavigator(index) {
+  const boundedIndex = Math.max(0, Math.min(state.answers.length - 1, index));
+  const percent =
+    state.answers.length <= 1
+      ? 0
+      : (boundedIndex / (state.answers.length - 1)) * 100;
+  const label = pageLabel(state.answers[boundedIndex]);
 
-  await animatePreparedFlip(complete, duration);
+  elements.pageNavigator.style.setProperty("--page-position", `${percent}%`);
+  elements.pageTrackPreview.textContent = label;
+  elements.pageTrack.setAttribute("aria-valuenow", String(boundedIndex + 1));
+  elements.pageTrack.setAttribute("aria-valuetext", `第 ${label} 页`);
+  state.scrubTargetIndex = boundedIndex;
+}
 
-  if (complete) {
-    for (let page = 0; page < extraPages && state.isOpen; page += 1) {
-      await wait(55);
-      await runAutomaticFlip(direction);
-    }
-    playSettleSound();
+function revealAnswer() {
+  elements.answerContent.classList.remove("answer-reveal");
+  void elements.answerContent.offsetWidth;
+  elements.answerContent.classList.add("answer-reveal");
+}
+
+async function navigateToIndex(targetIndex) {
+  if (
+    !state.isOpen ||
+    state.mode !== "swipe" ||
+    state.isAnimating
+  ) {
+    return;
   }
 
+  const target = Math.max(0, Math.min(state.answers.length - 1, targetIndex));
+  updateNavigator(target);
+
+  if (target === state.currentIndex) {
+    elements.openBook.classList.remove("is-seeking");
+    elements.pageNavigator.classList.remove("is-turning");
+    elements.pageTrackInstruction.textContent = "滑动或轻点某一处";
+    revealAnswer();
+    return;
+  }
+
+  state.isAnimating = true;
+  const navigationToken = ++state.navigationToken;
+  const startIndex = state.currentIndex;
+  const distance = target - startIndex;
+  const direction = Math.sign(distance);
+  const flipCount = Math.min(
+    9,
+    Math.max(1, Math.ceil(Math.log2(Math.abs(distance) + 1) * 1.45))
+  );
+
+  elements.openBook.classList.add("is-seeking");
+  elements.pageNavigator.classList.add("is-turning");
+  elements.pageTrackInstruction.textContent =
+    `正在翻到第 ${pageLabel(state.answers[target])} 页`;
+
+  for (let step = 1; step <= flipCount; step += 1) {
+    if (
+      navigationToken !== state.navigationToken ||
+      !state.isOpen
+    ) {
+      return;
+    }
+
+    const progress = step / flipCount;
+    const easedProgress = 1 - Math.pow(1 - progress, 1.35);
+    let intermediateIndex =
+      step === flipCount
+        ? target
+        : Math.round(startIndex + distance * easedProgress);
+
+    if (intermediateIndex === state.currentIndex) {
+      intermediateIndex = normalizedIndex(state.currentIndex + direction);
+    }
+
+    const edgeSlowdown =
+      step === 1 || step === flipCount ? 75 : 0;
+    const duration =
+      Math.max(115, 205 - flipCount * 7) + edgeSlowdown;
+
+    await runAutomaticFlip(
+      direction,
+      intermediateIndex,
+      duration,
+      { quiet: step !== flipCount }
+    );
+    if (step !== flipCount) await wait(28);
+  }
+
+  if (navigationToken !== state.navigationToken) return;
+
+  state.currentIndex = target;
+  paintMainAnswer(target);
+  elements.openBook.classList.remove("is-seeking");
+  elements.pageNavigator.classList.remove("is-turning");
+  elements.pageTrackInstruction.textContent = "滑动或轻点某一处";
+  revealAnswer();
+  playSettleSound();
+  vibrate(8);
   state.isAnimating = false;
+}
+
+function targetIndexFromClientX(clientX) {
+  const rect = elements.pageTrack.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  return Math.round(ratio * (state.answers.length - 1));
+}
+
+function updateScrubPosition(clientX) {
+  const target = targetIndexFromClientX(clientX);
+  updateNavigator(target);
+  elements.pageTrackInstruction.textContent =
+    `松手后翻到第 ${pageLabel(state.answers[target])} 页`;
+}
+
+function onTrackPointerDown(event) {
+  if (
+    state.mode !== "swipe" ||
+    state.isAnimating ||
+    state.scrubPointerId !== null
+  ) {
+    return;
+  }
+
+  state.scrubPointerId = event.pointerId;
+  elements.pageTrack.setPointerCapture(event.pointerId);
+  elements.pageNavigator.classList.add("is-scrubbing");
+  elements.openBook.classList.add("is-seeking");
+  updateScrubPosition(event.clientX);
+}
+
+function onTrackPointerMove(event) {
+  if (event.pointerId !== state.scrubPointerId) return;
+  updateScrubPosition(event.clientX);
+}
+
+function onTrackPointerEnd(event) {
+  if (event.pointerId !== state.scrubPointerId) return;
+  state.scrubPointerId = null;
+  elements.pageNavigator.classList.remove("is-scrubbing");
+  void navigateToIndex(state.scrubTargetIndex);
+}
+
+function onTrackKeyDown(event) {
+  if (state.mode !== "swipe" || state.isAnimating) return;
+
+  const keyTargets = {
+    ArrowLeft: state.scrubTargetIndex - 1,
+    ArrowDown: state.scrubTargetIndex - 1,
+    ArrowRight: state.scrubTargetIndex + 1,
+    ArrowUp: state.scrubTargetIndex + 1,
+    PageDown: state.scrubTargetIndex - 10,
+    PageUp: state.scrubTargetIndex + 10,
+    Home: 0,
+    End: state.answers.length - 1
+  };
+
+  if (!(event.key in keyTargets)) return;
+  event.preventDefault();
+  void navigateToIndex(keyTargets[event.key]);
 }
 
 function showModePicker() {
@@ -252,14 +403,17 @@ function openBook(mode) {
 
   if (mode === "random") {
     elements.questionCopy.textContent = "你问过的问题，已经被这一页听见";
-    elements.openBook.classList.remove("swipe-enabled");
-    elements.turnSurface.style.cursor = "default";
+    elements.pageNavigator.classList.remove("is-visible");
+    elements.pageNavigator.hidden = true;
     elements.statusText.textContent = "轻触“再问一次”，可以重新抽取答案";
   } else {
-    elements.questionCopy.textContent = "向左或向右滑动书页，松手后让它停下";
-    elements.openBook.classList.add("swipe-enabled");
-    elements.turnSurface.style.cursor = "grab";
-    elements.statusText.textContent = "左右滑动右侧书页，速度越快，翻得越远";
+    elements.questionCopy.textContent = "滑动书下方的页数轨道，松手后等待书页停下";
+    updateNavigator(state.currentIndex);
+    elements.pageNavigator.hidden = false;
+    requestAnimationFrame(() => {
+      elements.pageNavigator.classList.add("is-visible");
+    });
+    elements.statusText.textContent = "滑动或轻点书下方的轨道，选择想停下的位置";
   }
 
   playOpenSound();
@@ -271,12 +425,15 @@ function openBook(mode) {
 function closeBook() {
   state.isOpen = false;
   state.mode = null;
-  state.pointerId = null;
+  state.navigationToken += 1;
+  state.scrubPointerId = null;
   state.isAnimating = false;
   resetFlip();
   elements.book.dataset.state = "closed";
   elements.openBook.setAttribute("aria-hidden", "true");
-  elements.openBook.classList.remove("swipe-enabled");
+  elements.openBook.classList.remove("is-seeking");
+  elements.pageNavigator.classList.remove("is-visible", "is-scrubbing", "is-turning");
+  elements.pageNavigator.hidden = true;
   elements.openActions.hidden = true;
   elements.openActions.style.display = "";
   elements.statusText.hidden = false;
@@ -285,74 +442,7 @@ function closeBook() {
 }
 
 async function turnOnePage(direction) {
-  if (
-    !state.isOpen ||
-    state.mode !== "swipe" ||
-    state.isAnimating ||
-    state.pointerId !== null
-  ) {
-    return;
-  }
-  state.isAnimating = true;
-  await runAutomaticFlip(direction);
-  playSettleSound();
-  state.isAnimating = false;
-}
-
-function onPointerDown(event) {
-  if (
-    !state.isOpen ||
-    state.mode !== "swipe" ||
-    state.pointerId !== null ||
-    state.isAnimating
-  ) {
-    return;
-  }
-  state.pointerId = event.pointerId;
-  state.pointerStartX = event.clientX;
-  state.pointerLastX = event.clientX;
-  state.pointerLastTime = performance.now();
-  state.pointerVelocity = 0;
-  elements.openBook.setPointerCapture(event.pointerId);
-}
-
-function onPointerMove(event) {
-  if (event.pointerId !== state.pointerId) return;
-
-  const now = performance.now();
-  const deltaX = event.clientX - state.pointerLastX;
-  const deltaTime = Math.max(8, now - state.pointerLastTime);
-  state.pointerVelocity = state.pointerVelocity * 0.55 + (deltaX / deltaTime) * 0.45;
-  const totalDelta = event.clientX - state.pointerStartX;
-
-  if (Math.abs(totalDelta) > 3) {
-    const direction = totalDelta < 0 ? 1 : -1;
-    if (direction !== state.flipDirection) {
-      if (state.flipDirection) resetFlip();
-      prepareFlip(direction);
-    }
-
-    const pageWidth = Math.max(1, elements.openBook.clientWidth / 2);
-    const progress = Math.min(0.985, Math.abs(totalDelta) / (pageWidth * 0.88));
-    setFlipTransform(progress);
-  }
-  state.pointerLastX = event.clientX;
-  state.pointerLastTime = now;
-}
-
-function onPointerEnd(event) {
-  if (event.pointerId !== state.pointerId) return;
-  state.pointerId = null;
-  if (!state.flipDirection) return;
-
-  const directedVelocity =
-    -state.pointerVelocity * state.flipDirection;
-  const complete =
-    state.flipProgress >= 0.42 || directedVelocity > 0.38;
-  const extraPages = complete
-    ? Math.min(3, Math.max(0, Math.floor((directedVelocity - 0.8) * 1.4)))
-    : 0;
-  void settleFlip(complete, extraPages);
+  void navigateToIndex(state.currentIndex + direction);
 }
 
 function ensureAudio() {
@@ -450,14 +540,15 @@ async function init() {
       if (state.mode === "random") {
         showAnswer(randomIndex());
       } else {
-        void turnOnePage(1);
+        void navigateToIndex(randomIndex());
       }
     });
 
-    elements.openBook.addEventListener("pointerdown", onPointerDown);
-    elements.openBook.addEventListener("pointermove", onPointerMove);
-    elements.openBook.addEventListener("pointerup", onPointerEnd);
-    elements.openBook.addEventListener("pointercancel", onPointerEnd);
+    elements.pageTrack.addEventListener("pointerdown", onTrackPointerDown);
+    elements.pageTrack.addEventListener("pointermove", onTrackPointerMove);
+    elements.pageTrack.addEventListener("pointerup", onTrackPointerEnd);
+    elements.pageTrack.addEventListener("pointercancel", onTrackPointerEnd);
+    elements.pageTrack.addEventListener("keydown", onTrackKeyDown);
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         if (state.modePickerOpen) hideModePicker();
