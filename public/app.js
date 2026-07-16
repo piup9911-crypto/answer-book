@@ -2,7 +2,10 @@ const elements = {
   answerContent: document.querySelector("#answerContent"),
   answerNumber: document.querySelector("#answerNumber"),
   answerText: document.querySelector("#answerText"),
+  blockBendSlices: [...document.querySelectorAll(".block-bend-slice")],
+  blockLagPages: [...document.querySelectorAll(".block-lag-page")],
   book: document.querySelector("#book"),
+  bookShadow: document.querySelector(".book-shadow"),
   closeButton: document.querySelector("#closeButton"),
   coverButton: document.querySelector("#coverButton"),
   errorToast: document.querySelector("#errorToast"),
@@ -200,8 +203,12 @@ function wait(milliseconds) {
 }
 
 async function animatePreparedFlip(complete, duration, { quiet = false } = {}) {
-  setFlipTransform(complete ? 1 : 0, duration);
-  await wait(duration + 24);
+  if (complete) {
+    await animateLeafTurn(state.flipDirection, duration);
+  } else {
+    setFlipTransform(0, duration);
+    await wait(duration + 24);
+  }
 
   if (complete) {
     state.currentIndex = state.flipTargetIndex;
@@ -214,6 +221,67 @@ async function animatePreparedFlip(complete, duration, { quiet = false } = {}) {
   }
 
   resetFlip({ restoreCurrent: !complete });
+}
+
+async function animateLeafTurn(direction, duration) {
+  const sign = -direction;
+  elements.turningSheet.style.transition = "none";
+  elements.turningSheet.style.setProperty("--leaf-duration", `${duration}ms`);
+  elements.turningSheet.style.setProperty("--flip-shadow", "1");
+  elements.turningSheet.classList.add("is-curling");
+
+  const animation = elements.turningSheet.animate(
+    [
+      {
+        transform: "rotateY(0deg) rotateZ(0deg) translateZ(2px) scaleX(1)",
+        offset: 0,
+        easing: "cubic-bezier(0.32, 0, 0.64, 1)"
+      },
+      {
+        transform:
+          `rotateY(${sign * 58}deg) rotateZ(${sign * 0.7}deg) ` +
+          "translateZ(9px) scaleX(0.992)",
+        offset: 0.34,
+        easing: "cubic-bezier(0.26, 0.02, 0.54, 1)"
+      },
+      {
+        transform:
+          `rotateY(${sign * 118}deg) rotateZ(${sign * -0.38}deg) ` +
+          "translateZ(15px) scaleX(0.973)",
+        offset: 0.67,
+        easing: "cubic-bezier(0.3, 0, 0.48, 1)"
+      },
+      {
+        transform:
+          `rotateY(${sign * 184}deg) rotateZ(${sign * 0.18}deg) ` +
+          "translateZ(5px) scaleX(0.992)",
+        offset: 0.93,
+        easing: "ease-out"
+      },
+      {
+        transform:
+          `rotateY(${sign * 180}deg) rotateZ(0deg) translateZ(2px) scaleX(1)`,
+        offset: 1
+      }
+    ],
+    {
+      duration,
+      fill: "forwards"
+    }
+  );
+
+  try {
+    await animation.finished;
+  } catch {
+    // Closing the book can cancel an in-flight page animation.
+  }
+
+  elements.turningSheet.style.transform =
+    `rotateY(${sign * 180}deg) translateZ(2px)`;
+  animation.cancel();
+  elements.turningSheet.classList.remove("is-curling");
+  elements.turningSheet.style.removeProperty("--leaf-duration");
+  state.flipProgress = 1;
 }
 
 async function runAutomaticFlip(
@@ -309,11 +377,149 @@ async function navigateWithLeaves(target, navigationToken) {
 }
 
 function resetThickBlock() {
+  for (const layer of [
+    ...elements.blockBendSlices,
+    ...elements.blockLagPages
+  ]) {
+    layer.getAnimations().forEach((animation) => animation.cancel());
+    layer.style.transform = "";
+  }
   elements.thickPageBlock.classList.remove("is-active");
+  elements.thickPageBlock.classList.remove("is-bending");
   elements.thickPageBlock.setAttribute("aria-hidden", "true");
   elements.thickPageBlock.style.transition = "none";
   elements.thickPageBlock.style.transform = "";
   delete elements.thickPageBlock.dataset.direction;
+}
+
+function animateBlockLayers(direction, duration, phase) {
+  const relativeSign = direction > 0 ? 1 : -1;
+  const sliceOffsets = elements.blockBendSlices.map((_, index) => {
+    const distanceFromSpine = direction > 0 ? index : 7 - index;
+    return relativeSign * distanceFromSpine * 4.15;
+  });
+  const lagOffsets = [11, 20, 30].map((offset) => relativeSign * offset);
+
+  const sliceAnimations = elements.blockBendSlices.map((slice, index) => {
+    const offset = sliceOffsets[index];
+    const keyframes =
+      phase === "lift"
+        ? [
+            {
+              transform:
+                `rotateY(0deg) translateZ(var(--block-half-depth))`
+            },
+            {
+              transform:
+                `rotateY(${offset}deg) translateZ(calc(var(--block-half-depth) + ` +
+                `${Math.sin((index / 7) * Math.PI) * 16}px))`
+            }
+          ]
+        : [
+            {
+              transform:
+                `rotateY(${offset}deg) translateZ(calc(var(--block-half-depth) + ` +
+                `${Math.sin((index / 7) * Math.PI) * 16}px))`,
+              offset: 0
+            },
+            {
+              transform:
+                `rotateY(${offset * -0.36}deg) ` +
+                "translateZ(calc(var(--block-half-depth) + 5px))",
+              offset: 0.72
+            },
+            {
+              transform:
+                "rotateY(0deg) translateZ(var(--block-half-depth))",
+              offset: 1
+            }
+          ];
+
+    return slice.animate(keyframes, {
+      duration,
+      easing:
+        phase === "lift"
+          ? "cubic-bezier(0.28, 0.02, 0.58, 1)"
+          : "cubic-bezier(0.2, 0.72, 0.24, 1)",
+      fill: "forwards"
+    });
+  });
+
+  const lagAnimations = elements.blockLagPages.map((page, index) => {
+    const offset = lagOffsets[index];
+    const depth = -2 - index * 3;
+    const keyframes =
+      phase === "lift"
+        ? [
+            {
+              transform: `rotateY(0deg) translateZ(${depth}px)`,
+              opacity: 0.12
+            },
+            {
+              transform: `rotateY(${offset}deg) translateZ(${depth - 2}px)`,
+              opacity: 0.82 - index * 0.18
+            }
+          ]
+        : [
+            {
+              transform: `rotateY(${offset}deg) translateZ(${depth - 2}px)`,
+              offset: 0
+            },
+            {
+              transform:
+                `rotateY(${offset * -0.28}deg) translateZ(${depth + 1}px)`,
+              offset: 0.78
+            },
+            {
+              transform: `rotateY(0deg) translateZ(${depth}px)`,
+              offset: 1
+            }
+          ];
+
+    return page.animate(keyframes, {
+      duration: duration + index * 34,
+      delay: phase === "lift" ? index * 24 : index * 18,
+      easing:
+        phase === "lift"
+          ? "cubic-bezier(0.32, 0, 0.6, 1)"
+          : "cubic-bezier(0.18, 0.72, 0.22, 1)",
+      fill: "forwards"
+    });
+  });
+
+  return [...sliceAnimations, ...lagAnimations];
+}
+
+async function animateBookLanding(direction) {
+  const sign = direction > 0 ? 1 : -1;
+  const animation = elements.openBook.animate(
+    [
+      { transform: "rotateX(2deg) scale(1) translateY(0) rotateZ(0deg)" },
+      {
+        transform:
+          `rotateX(2.35deg) scale(0.998) translateY(2.4px) ` +
+          `rotateZ(${sign * 0.12}deg)`,
+        offset: 0.42
+      },
+      {
+        transform:
+          `rotateX(1.9deg) scale(1.001) translateY(-0.8px) ` +
+          `rotateZ(${sign * -0.04}deg)`,
+        offset: 0.72
+      },
+      { transform: "rotateX(2deg) scale(1) translateY(0) rotateZ(0deg)" }
+    ],
+    {
+      duration: 280,
+      easing: "ease-out"
+    }
+  );
+
+  try {
+    await animation.finished;
+  } catch {
+    // Closing the book can cancel the landing response.
+  }
 }
 
 async function navigateWithPageBlock(target, navigationToken) {
@@ -337,6 +543,7 @@ async function navigateWithPageBlock(target, navigationToken) {
   elements.thickPageBlock.dataset.direction =
     direction > 0 ? "forward" : "backward";
   elements.thickPageBlock.classList.add("is-active");
+  elements.thickPageBlock.classList.add("is-bending");
   elements.thickPageBlock.setAttribute("aria-hidden", "false");
   elements.thickPageBlock.style.transition = "none";
   elements.thickPageBlock.style.transform = "rotateY(0deg) translateZ(4px)";
@@ -344,7 +551,23 @@ async function navigateWithPageBlock(target, navigationToken) {
   elements.thickPageBlock.style.transition =
     `transform ${firstPhase}ms cubic-bezier(0.34, 0.02, 0.58, 1)`;
   elements.thickPageBlock.style.transform =
-    `rotateY(${uprightAngle}deg) translateZ(4px)`;
+    `rotateY(${uprightAngle}deg) rotateZ(${direction * -0.35}deg) translateZ(12px)`;
+  const liftLayerAnimations = animateBlockLayers(
+    direction,
+    firstPhase + 55,
+    "lift"
+  );
+  const liftShadowAnimation = elements.bookShadow.animate(
+    [
+      { transform: "translate(-50%, -50%) scaleX(1)", opacity: 0.72 },
+      { transform: "translate(-50%, -50%) scaleX(0.82)", opacity: 0.46 }
+    ],
+    {
+      duration: firstPhase,
+      fill: "forwards",
+      easing: "ease-in-out"
+    }
+  );
   playBlockSound(depth);
 
   await wait(firstPhase + 55);
@@ -359,13 +582,38 @@ async function navigateWithPageBlock(target, navigationToken) {
   state.currentIndex = target;
   paintMainAnswer(target);
   updateBookThickness(target);
+  liftShadowAnimation.cancel();
 
   elements.thickPageBlock.style.transition =
     `transform ${secondPhase}ms cubic-bezier(0.38, 0, 0.22, 1)`;
   elements.thickPageBlock.style.transform =
-    `rotateY(${angle}deg) translateZ(4px)`;
+    `rotateY(${angle}deg) rotateZ(${direction * 0.12}deg) translateZ(4px)`;
+  const settleLayerAnimations = animateBlockLayers(
+    direction,
+    secondPhase + 90,
+    "settle"
+  );
+  const settleShadowAnimation = elements.bookShadow.animate(
+    [
+      { transform: "translate(-50%, -50%) scaleX(0.82)", opacity: 0.46 },
+      { transform: "translate(-50%, -50%) scaleX(1.035)", opacity: 0.78, offset: 0.78 },
+      { transform: "translate(-50%, -50%) scaleX(1)", opacity: 0.72 }
+    ],
+    {
+      duration: secondPhase + 160,
+      easing: "ease-out"
+    }
+  );
 
-  await wait(secondPhase + 32);
+  await wait(secondPhase + 48);
+  await animateBookLanding(direction);
+  settleShadowAnimation.cancel();
+  for (const animation of [
+    ...liftLayerAnimations,
+    ...settleLayerAnimations
+  ]) {
+    animation.cancel();
+  }
   resetThickBlock();
   return navigationToken === state.navigationToken && state.isOpen;
 }
