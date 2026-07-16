@@ -10,8 +10,6 @@ const elements = {
   coverButton: document.querySelector("#coverButton"),
   errorToast: document.querySelector("#errorToast"),
   loadingScreen: document.querySelector("#loadingScreen"),
-  modeCancel: document.querySelector("#modeCancel"),
-  modePicker: document.querySelector("#modePicker"),
   openActions: document.querySelector("#openActions"),
   openBook: document.querySelector("#openBook"),
   pageNavigator: document.querySelector("#pageNavigator"),
@@ -22,12 +20,10 @@ const elements = {
   pageTrackPreview: document.querySelector("#pageTrackPreview"),
   pageTrackThumb: document.querySelector("#pageTrackThumb"),
   questionCopy: document.querySelector("#questionCopy"),
-  randomMode: document.querySelector("#randomMode"),
   againButton: document.querySelector("#againButton"),
   soundButton: document.querySelector("#soundButton"),
   soundLabel: document.querySelector("#soundLabel"),
   statusText: document.querySelector("#statusText"),
-  swipeMode: document.querySelector("#swipeMode"),
   thickPageBlock: document.querySelector("#thickPageBlock"),
   sheetBackAnswer: document.querySelector("#sheetBackAnswer"),
   sheetBackNumber: document.querySelector("#sheetBackNumber"),
@@ -46,7 +42,11 @@ const state = {
   audioContext: null,
   currentIndex: 0,
   mode: null,
-  modePickerOpen: false,
+  coverPointerId: null,
+  coverPointerStartX: 0,
+  coverPointerStartY: 0,
+  coverPointerMoved: false,
+  suppressCoverClick: false,
   flipDirection: 0,
   flipProgress: 0,
   flipTargetIndex: 0,
@@ -80,6 +80,11 @@ function pageLabel(answer) {
   return String(answer.page || answer.id).padStart(3, "0");
 }
 
+function indexLabel(index) {
+  if (index < 0) return "000";
+  return pageLabel(state.answers[index]);
+}
+
 function normalizedIndex(index) {
   const length = state.answers.length;
   return ((index % length) + length) % length;
@@ -94,6 +99,13 @@ function paintAnswer(answer, textNode, numberNode, pageNode) {
 }
 
 function paintMainAnswer(index) {
+  if (index < 0) {
+    elements.answerText.textContent =
+      "答案尚未抵达。向左翻页，在心有回响之处停下。";
+    elements.answerNumber.textContent = "BEGIN · 000";
+    elements.pageNumber.textContent = "000";
+    return;
+  }
   paintAnswer(
     state.answers[normalizedIndex(index)],
     elements.answerText,
@@ -103,6 +115,19 @@ function paintMainAnswer(index) {
 }
 
 function paintSheetAnswer(index, side) {
+  if (index < 0) {
+    const textNode =
+      side === "front" ? elements.sheetFrontText : elements.sheetBackText;
+    const numberNode =
+      side === "front" ? elements.sheetFrontNumber : elements.sheetBackNumber;
+    const pageNode =
+      side === "front" ? elements.sheetFrontPage : elements.sheetBackPage;
+    textNode.textContent =
+      "答案尚未抵达。向左翻页，在心有回响之处停下。";
+    numberNode.textContent = "BEGIN · 000";
+    pageNode.textContent = "000";
+    return;
+  }
   const answer = state.answers[normalizedIndex(index)];
   if (side === "front") {
     paintAnswer(
@@ -122,7 +147,7 @@ function paintSheetAnswer(index, side) {
 }
 
 function showAnswer(index, { animate = true } = {}) {
-  state.currentIndex = normalizedIndex(index);
+  state.currentIndex = index < 0 ? -1 : normalizedIndex(index);
   paintMainAnswer(state.currentIndex);
   updateBookThickness(state.currentIndex);
 
@@ -135,7 +160,8 @@ function showAnswer(index, { animate = true } = {}) {
 
 function updateBookThickness(index) {
   if (state.answers.length <= 1) return;
-  const ratio = normalizedIndex(index) / (state.answers.length - 1);
+  const ratio =
+    index < 0 ? 0 : normalizedIndex(index) / (state.answers.length - 1);
   const minimumDepth = 4;
   const maximumExtraDepth = 13;
   const leftDepth = minimumDepth + ratio * maximumExtraDepth;
@@ -167,7 +193,8 @@ function setFlipTransform(progress, duration = 0) {
 
 function prepareFlip(direction, targetIndex = state.currentIndex + direction) {
   state.flipDirection = direction;
-  state.flipTargetIndex = normalizedIndex(targetIndex);
+  state.flipTargetIndex =
+    targetIndex < 0 ? -1 : normalizedIndex(targetIndex);
   elements.turningSheet.dataset.direction =
     direction > 0 ? "forward" : "backward";
 
@@ -296,12 +323,12 @@ async function runAutomaticFlip(
 }
 
 function updateNavigator(index) {
-  const boundedIndex = Math.max(0, Math.min(state.answers.length - 1, index));
+  const boundedIndex = Math.max(-1, Math.min(state.answers.length - 1, index));
   const percent =
-    state.answers.length <= 1
+    state.answers.length === 0
       ? 0
-      : (boundedIndex / (state.answers.length - 1)) * 100;
-  const label = pageLabel(state.answers[boundedIndex]);
+      : ((boundedIndex + 1) / state.answers.length) * 100;
+  const label = indexLabel(boundedIndex);
 
   elements.pageNavigator.style.setProperty("--page-position", `${percent}%`);
   elements.pageTrackPreview.textContent = label;
@@ -321,7 +348,7 @@ function beginNavigation(target) {
   elements.openBook.classList.add("is-seeking");
   elements.pageNavigator.classList.add("is-turning");
   elements.pageTrackInstruction.textContent =
-    `正在翻到第 ${pageLabel(state.answers[target])} 页`;
+    `正在翻到第 ${indexLabel(target)} 页`;
 }
 
 function finishNavigation(target) {
@@ -358,7 +385,13 @@ async function navigateWithLeaves(target, navigationToken) {
         : Math.round(startIndex + distance * progress);
 
     if (intermediateIndex === state.currentIndex) {
-      intermediateIndex = normalizedIndex(state.currentIndex + direction);
+      intermediateIndex = Math.max(
+        -1,
+        Math.min(
+          state.answers.length - 1,
+          state.currentIndex + direction
+        )
+      );
     }
 
     const edgeSlowdown = step === 1 || step === flipCount ? 45 : 0;
@@ -627,7 +660,7 @@ async function navigateToIndex(targetIndex, { interaction = "drag" } = {}) {
     return;
   }
 
-  const target = Math.max(0, Math.min(state.answers.length - 1, targetIndex));
+  const target = Math.max(-1, Math.min(state.answers.length - 1, targetIndex));
   updateNavigator(target);
 
   if (target === state.currentIndex) {
@@ -652,14 +685,14 @@ async function navigateToIndex(targetIndex, { interaction = "drag" } = {}) {
 function targetIndexFromClientX(clientX) {
   const rect = elements.pageTrack.getBoundingClientRect();
   const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  return Math.round(ratio * (state.answers.length - 1));
+  return Math.round(ratio * state.answers.length) - 1;
 }
 
 function updateScrubPosition(clientX) {
   const target = targetIndexFromClientX(clientX);
   updateNavigator(target);
   elements.pageTrackInstruction.textContent =
-    `松手后逐页翻到第 ${pageLabel(state.answers[target])} 页`;
+    `松手后逐页翻到第 ${indexLabel(target)} 页`;
 }
 
 function onTrackPointerDown(event) {
@@ -708,7 +741,7 @@ function onTrackPointerEnd(event) {
     updateNavigator(target);
     elements.openBook.classList.add("is-seeking");
     elements.pageTrackInstruction.textContent =
-      `打开厚书页到第 ${pageLabel(state.answers[target])} 页`;
+      `打开厚书页到第 ${indexLabel(target)} 页`;
     void navigateToIndex(target, { interaction: "click" });
     return;
   }
@@ -728,7 +761,7 @@ function onTrackKeyDown(event) {
     ArrowUp: state.scrubTargetIndex + 1,
     PageDown: state.scrubTargetIndex - 10,
     PageUp: state.scrubTargetIndex + 10,
-    Home: 0,
+    Home: -1,
     End: state.answers.length - 1
   };
 
@@ -737,33 +770,13 @@ function onTrackKeyDown(event) {
   void navigateToIndex(keyTargets[event.key], { interaction: "drag" });
 }
 
-function showModePicker() {
-  if (state.isOpen || state.modePickerOpen) return;
-  state.modePickerOpen = true;
-  elements.modePicker.hidden = false;
-  requestAnimationFrame(() => elements.modePicker.classList.add("is-visible"));
-  elements.statusText.textContent = "选择一种与你的问题相遇的方式";
-  playTapSound();
-}
-
-function hideModePicker() {
-  state.modePickerOpen = false;
-  elements.modePicker.classList.remove("is-visible");
-  setTimeout(() => {
-    if (!state.modePickerOpen) elements.modePicker.hidden = true;
-  }, 260);
-  if (!state.isOpen) {
-    elements.statusText.textContent = "先想好一个问题，再触碰书封";
-  }
-}
-
 function openBook(mode) {
+  if (state.isOpen) return;
   state.mode = mode;
   state.isOpen = true;
-  hideModePicker();
   resetFlip();
 
-  const startingIndex = randomIndex();
+  const startingIndex = mode === "swipe" ? -1 : randomIndex();
   showAnswer(startingIndex, { animate: false });
 
   elements.book.dataset.state = "opening";
@@ -778,13 +791,14 @@ function openBook(mode) {
     elements.pageNavigator.hidden = true;
     elements.statusText.textContent = "轻触“再问一次”，可以重新抽取答案";
   } else {
-    elements.questionCopy.textContent = "滑动书下方的页数轨道，松手后等待书页停下";
+    elements.questionCopy.textContent =
+      "从第零页开始，把书页停在你真正想停下的位置";
     updateNavigator(state.currentIndex);
     elements.pageNavigator.hidden = false;
     requestAnimationFrame(() => {
       elements.pageNavigator.classList.add("is-visible");
     });
-    elements.pageTrackInstruction.textContent = "滑动薄页 · 点击翻动厚页";
+    elements.pageTrackInstruction.textContent = "从 000 开始 · 滑动薄页";
     elements.statusText.textContent = "拖动会逐页翻动，轻点会打开一叠厚书页";
   }
 
@@ -811,12 +825,91 @@ function closeBook() {
   elements.openActions.hidden = true;
   elements.openActions.style.display = "";
   elements.statusText.hidden = false;
-  elements.statusText.textContent = "先想好一个问题，再触碰书封";
+  elements.statusText.textContent = "轻触随机开启 · 向左滑动进入翻页";
   playCloseSound();
 }
 
 async function turnOnePage(direction) {
   void navigateToIndex(state.currentIndex + direction, { interaction: "drag" });
+}
+
+function isMobileBookInteraction() {
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.innerWidth <= 820
+  );
+}
+
+function onCoverPointerDown(event) {
+  if (state.isOpen || state.coverPointerId !== null) return;
+  state.coverPointerId = event.pointerId;
+  state.coverPointerStartX = event.clientX;
+  state.coverPointerStartY = event.clientY;
+  state.coverPointerMoved = false;
+  elements.coverButton.setPointerCapture(event.pointerId);
+}
+
+function onCoverPointerMove(event) {
+  if (event.pointerId !== state.coverPointerId) return;
+  const deltaX = event.clientX - state.coverPointerStartX;
+  const deltaY = event.clientY - state.coverPointerStartY;
+  if (Math.hypot(deltaX, deltaY) >= 8) {
+    state.coverPointerMoved = true;
+  }
+  const isLeftSwipe =
+    isMobileBookInteraction() &&
+    deltaX <= -28 &&
+    Math.abs(deltaX) > Math.abs(deltaY) * 1.15;
+  elements.coverButton.classList.toggle("is-swipe-ready", isLeftSwipe);
+}
+
+function resetCoverPointer() {
+  state.coverPointerId = null;
+  state.coverPointerMoved = false;
+  elements.coverButton.classList.remove("is-swipe-ready");
+}
+
+function onCoverPointerEnd(event) {
+  if (event.pointerId !== state.coverPointerId) return;
+  const deltaX = event.clientX - state.coverPointerStartX;
+  const deltaY = event.clientY - state.coverPointerStartY;
+  const shouldOpenSwipeMode =
+    event.type !== "pointercancel" &&
+    isMobileBookInteraction() &&
+    deltaX <= -48 &&
+    Math.abs(deltaX) > Math.abs(deltaY) * 1.2;
+
+  if (shouldOpenSwipeMode) {
+    state.suppressCoverClick = true;
+    setTimeout(() => {
+      state.suppressCoverClick = false;
+    }, 500);
+    resetCoverPointer();
+    openBook("swipe");
+    return;
+  }
+
+  resetCoverPointer();
+}
+
+function onCoverClick() {
+  if (state.suppressCoverClick) {
+    state.suppressCoverClick = false;
+    return;
+  }
+  openBook("random");
+}
+
+function onOpenBookClick(event) {
+  if (
+    !state.isOpen ||
+    state.isAnimating ||
+    elements.book.dataset.state !== "open"
+  ) {
+    return;
+  }
+  event.preventDefault();
+  closeBook();
 }
 
 function ensureAudio() {
@@ -921,10 +1014,12 @@ async function init() {
     }
     state.answers = answerBook.answers;
 
-    elements.coverButton.addEventListener("click", showModePicker);
-    elements.modeCancel.addEventListener("click", hideModePicker);
-    elements.randomMode.addEventListener("click", () => openBook("random"));
-    elements.swipeMode.addEventListener("click", () => openBook("swipe"));
+    elements.coverButton.addEventListener("pointerdown", onCoverPointerDown);
+    elements.coverButton.addEventListener("pointermove", onCoverPointerMove);
+    elements.coverButton.addEventListener("pointerup", onCoverPointerEnd);
+    elements.coverButton.addEventListener("pointercancel", onCoverPointerEnd);
+    elements.coverButton.addEventListener("click", onCoverClick);
+    elements.openBook.addEventListener("click", onOpenBookClick);
     elements.closeButton.addEventListener("click", closeBook);
     elements.soundButton.addEventListener("click", toggleSound);
     elements.againButton.addEventListener("click", () => {
@@ -942,8 +1037,7 @@ async function init() {
     elements.pageTrack.addEventListener("keydown", onTrackKeyDown);
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
-        if (state.modePickerOpen) hideModePicker();
-        else if (state.isOpen) closeBook();
+        if (state.isOpen) closeBook();
       }
       if (state.isOpen && state.mode === "swipe") {
         if (event.key === "ArrowLeft") void turnOnePage(-1);

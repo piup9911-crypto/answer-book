@@ -9,8 +9,8 @@
       content="阿祈的答案之书——触碰开启，或滑动书页，在停下的地方遇见答案。"
     />
     <title>阿祈的答案之书</title>
-    <link rel="stylesheet" href="/styles.css?v=6" />
-    <script type="module" src="/app.js?v=6"></script>
+    <link rel="stylesheet" href="/styles.css?v=9" />
+    <script type="module" src="/app.js?v=9"></script>
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
@@ -35,7 +35,12 @@
           <div class="book" id="book" data-state="closed">
           <div class="closed-book" id="closedBook">
             <div class="page-block" aria-hidden="true"></div>
-            <button class="front-cover" id="coverButton" type="button" aria-label="打开模式选择">
+            <button
+              class="front-cover"
+              id="coverButton"
+              type="button"
+              aria-label="轻触随机打开，或向左滑动进入翻页模式"
+            >
               <span class="cover-border cover-border-outer"></span>
               <span class="cover-border cover-border-inner"></span>
               <span class="corner corner-tl"></span>
@@ -47,7 +52,7 @@
               <span class="cover-title">答案之书</span>
               <span class="cover-owner">阿祈</span>
               <span class="cover-rule"></span>
-              <span class="cover-hint">轻触书封 · 选择开启方式</span>
+              <span class="cover-hint">轻触随机开启 · 向左滑动翻页</span>
             </button>
           </div>
 
@@ -144,7 +149,7 @@
               role="slider"
               tabindex="0"
               aria-label="选择答案页"
-              aria-valuemin="1"
+              aria-valuemin="0"
               aria-valuemax="412"
               aria-valuenow="1"
             >
@@ -155,33 +160,17 @@
               </span>
             </div>
             <div class="page-track-meta" aria-hidden="true">
-              <span>001</span>
+              <span>000</span>
               <span class="page-track-instruction" id="pageTrackInstruction">滑动或轻点某一处</span>
               <span>412</span>
             </div>
           </div>
         </div>
 
-        <div class="mode-picker" id="modePicker" hidden>
-          <p class="mode-intro">你想怎样打开这本书？</p>
-          <div class="mode-actions">
-            <button class="mode-card" id="randomMode" type="button">
-              <span class="mode-icon">✦</span>
-              <span class="mode-name">触碰开启</span>
-              <span class="mode-description">轻触一下，让书替你选一页</span>
-            </button>
-            <button class="mode-card" id="swipeMode" type="button">
-              <span class="mode-icon mode-pages" aria-hidden="true">≋</span>
-              <span class="mode-name">滑动翻页</span>
-              <span class="mode-description">滑动页数轨道，停在哪里就翻到哪里</span>
-            </button>
-          </div>
-          <button class="mode-cancel" id="modeCancel" type="button">暂时不问</button>
-        </div>
       </section>
 
       <footer class="controls">
-        <p class="status" id="statusText">先想好一个问题，再触碰书封</p>
+        <p class="status" id="statusText">轻触随机开启 · 向左滑动进入翻页</p>
         <div class="open-actions" id="openActions" hidden>
           <button class="text-button" id="againButton" type="button">再问一次</button>
           <span class="action-separator" aria-hidden="true"></span>
