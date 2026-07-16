@@ -28,7 +28,6 @@ const state = {
   answers: [],
   audioContext: null,
   currentIndex: 0,
-  lastRandomIndex: -1,
   mode: null,
   modePickerOpen: false,
   pointerId: null,
@@ -44,17 +43,19 @@ const state = {
 };
 
 function randomIndex() {
-  if (state.answers.length < 2) return 0;
+  const answerCount = state.answers.length;
+  if (answerCount <= 1) return 0;
 
+  // Reject the small remainder above the largest evenly divisible range.
+  // This gives every answer exactly the same probability and allows repeats.
+  const uniformLimit =
+    Math.floor(0x100000000 / answerCount) * answerCount;
   const values = new Uint32Array(1);
-  let next = state.lastRandomIndex;
-  while (next === state.lastRandomIndex) {
+  do {
     crypto.getRandomValues(values);
-    next = values[0] % state.answers.length;
-  }
+  } while (values[0] >= uniformLimit);
 
-  state.lastRandomIndex = next;
-  return next;
+  return values[0] % answerCount;
 }
 
 function pageLabel(answer) {
@@ -118,7 +119,7 @@ function openBook(mode) {
   hideModePicker();
   cancelInertia();
 
-  const startingIndex = mode === "random" ? randomIndex() : randomIndex();
+  const startingIndex = randomIndex();
   showAnswer(startingIndex, { animate: false });
 
   elements.book.dataset.state = "opening";
