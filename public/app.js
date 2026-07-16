@@ -1,3 +1,5 @@
+import { createThreeBook } from "./book-3d.js";
+
 const elements = {
   answerContent: document.querySelector("#answerContent"),
   answerNumber: document.querySelector("#answerNumber"),
@@ -5,6 +7,7 @@ const elements = {
   blockBendSlices: [...document.querySelectorAll(".block-bend-slice")],
   blockLagPages: [...document.querySelectorAll(".block-lag-page")],
   book: document.querySelector("#book"),
+  bookCanvas: document.querySelector("#bookCanvas"),
   bookShadow: document.querySelector(".book-shadow"),
   closeButton: document.querySelector("#closeButton"),
   coverButton: document.querySelector("#coverButton"),
@@ -57,7 +60,8 @@ const state = {
   scrubTargetIndex: 0,
   trackPointerStartX: 0,
   trackPointerMoved: false,
-  soundEnabled: true
+  soundEnabled: true,
+  book3D: null
 };
 
 function randomIndex() {
@@ -94,12 +98,16 @@ function paintAnswer(answer, textNode, numberNode, pageNode) {
 }
 
 function paintMainAnswer(index) {
+  const answer = state.answers[normalizedIndex(index)];
   paintAnswer(
-    state.answers[normalizedIndex(index)],
+    answer,
     elements.answerText,
     elements.answerNumber,
     elements.pageNumber
   );
+  state.book3D?.setAnswer(answer, {
+    visible: !elements.openBook.classList.contains("is-seeking")
+  });
 }
 
 function paintSheetAnswer(index, side) {
@@ -130,6 +138,8 @@ function showAnswer(index, { animate = true } = {}) {
     elements.answerContent.classList.remove("answer-change");
     void elements.answerContent.offsetWidth;
     elements.answerContent.classList.add("answer-change");
+    state.book3D?.hideAnswer();
+    state.book3D?.revealAnswer(520);
   }
 }
 
@@ -149,6 +159,7 @@ function updateBookThickness(index) {
     "--right-stack-depth",
     `${rightDepth.toFixed(2)}px`
   );
+  state.book3D?.setPageRatio(ratio);
 }
 
 function setFlipTransform(progress, duration = 0) {
@@ -163,6 +174,7 @@ function setFlipTransform(progress, duration = 0) {
   elements.turningSheet.style.transform =
     `rotateY(${angle}deg) translateZ(2px)`;
   state.flipProgress = clampedProgress;
+  state.book3D?.setLeafProgress(clampedProgress, state.flipDirection, 1);
 }
 
 function prepareFlip(direction, targetIndex = state.currentIndex + direction) {
@@ -183,6 +195,7 @@ function prepareFlip(direction, targetIndex = state.currentIndex + direction) {
 
   elements.turningSheet.classList.add("is-active");
   elements.turningSheet.setAttribute("aria-hidden", "false");
+  state.book3D?.beginLeaf(direction, 1);
   setFlipTransform(0);
 }
 
@@ -196,6 +209,7 @@ function resetFlip({ restoreCurrent = true } = {}) {
   delete elements.turningSheet.dataset.direction;
   state.flipDirection = 0;
   state.flipProgress = 0;
+  state.book3D?.resetLeaf();
 }
 
 function wait(milliseconds) {
@@ -225,6 +239,7 @@ async function animatePreparedFlip(complete, duration, { quiet = false } = {}) {
 
 async function animateLeafTurn(direction, duration) {
   const sign = -direction;
+  const threeAnimation = state.book3D?.animateLeaf(direction, duration);
   elements.turningSheet.style.transition = "none";
   elements.turningSheet.style.setProperty("--leaf-duration", `${duration}ms`);
   elements.turningSheet.style.setProperty("--flip-shadow", "1");
@@ -275,6 +290,7 @@ async function animateLeafTurn(direction, duration) {
   } catch {
     // Closing the book can cancel an in-flight page animation.
   }
+  await threeAnimation;
 
   elements.turningSheet.style.transform =
     `rotateY(${sign * 180}deg) translateZ(2px)`;
@@ -314,10 +330,12 @@ function revealAnswer() {
   elements.answerContent.classList.remove("answer-reveal");
   void elements.answerContent.offsetWidth;
   elements.answerContent.classList.add("answer-reveal");
+  state.book3D?.revealAnswer();
 }
 
 function beginNavigation(target) {
   state.isAnimating = true;
+  state.book3D?.hideAnswer();
   elements.openBook.classList.add("is-seeking");
   elements.pageNavigator.classList.add("is-turning");
   elements.pageTrackInstruction.textContent =
@@ -533,6 +551,11 @@ async function navigateWithPageBlock(target, navigationToken) {
   const uprightAngle = direction > 0 ? -88 : 88;
   const firstPhase = Math.round(duration * 0.48);
   const secondPhase = duration - firstPhase;
+  const threeBlockAnimation = state.book3D?.animateBlock(
+    direction,
+    distanceRatio,
+    duration + 105
+  );
 
   elements.openBook.style.setProperty("--block-depth", `${depth.toFixed(1)}px`);
   elements.openBook.style.setProperty(
@@ -606,6 +629,7 @@ async function navigateWithPageBlock(target, navigationToken) {
   );
 
   await wait(secondPhase + 48);
+  await threeBlockAnimation;
   await animateBookLanding(direction);
   settleShadowAnimation.cancel();
   for (const animation of [
@@ -765,6 +789,7 @@ function openBook(mode) {
 
   const startingIndex = randomIndex();
   showAnswer(startingIndex, { animate: false });
+  state.book3D?.open();
 
   elements.book.dataset.state = "opening";
   elements.openBook.setAttribute("aria-hidden", "false");
@@ -787,6 +812,7 @@ function openBook(mode) {
     elements.pageTrackInstruction.textContent = "滑动薄页 · 点击翻动厚页";
     elements.statusText.textContent = "拖动会逐页翻动，轻点会打开一叠厚书页";
   }
+  state.book3D?.setLeftPage(elements.questionCopy.textContent);
 
   playOpenSound();
   setTimeout(() => {
@@ -803,6 +829,7 @@ function closeBook() {
   state.isAnimating = false;
   resetFlip();
   resetThickBlock();
+  state.book3D?.close();
   elements.book.dataset.state = "closed";
   elements.openBook.setAttribute("aria-hidden", "true");
   elements.openBook.classList.remove("is-seeking");
@@ -913,6 +940,9 @@ function showError(message) {
 
 async function init() {
   try {
+    state.book3D = createThreeBook(elements.bookCanvas);
+    if (state.book3D) elements.openBook.classList.add("has-three");
+
     const response = await fetch("/data/aqi-answer-book.json", { cache: "no-store" });
     if (!response.ok) throw new Error(`答案数据加载失败（${response.status}）`);
     const answerBook = await response.json();

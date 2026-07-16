@@ -4,6 +4,9 @@ const requiredFiles = [
   "public/index.html",
   "public/styles.css",
   "public/app.js",
+  "public/book-3d.js",
+  "public/vendor/three.core.min.js",
+  "public/vendor/three.module.min.js",
   "public/data/aqi-answer-book.json"
 ];
 

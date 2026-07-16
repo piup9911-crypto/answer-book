@@ -385,6 +385,48 @@ button {
     visibility 0s linear 900ms;
 }
 
+.three-book-canvas {
+  position: absolute;
+  z-index: 0;
+  top: -12%;
+  left: -7%;
+  width: 114%;
+  height: 124%;
+  pointer-events: none;
+  opacity: 0;
+  filter: saturate(0.94) contrast(1.02);
+  transition: opacity 420ms ease 180ms;
+}
+
+.book[data-state="opening"] .open-book.has-three .three-book-canvas,
+.book[data-state="open"] .open-book.has-three .three-book-canvas {
+  opacity: 1;
+}
+
+.open-book.has-three::before,
+.open-book.has-three .page-stack,
+.open-book.has-three .book-spine,
+.open-book.has-three .turning-sheet,
+.open-book.has-three .thick-page-block {
+  visibility: hidden;
+}
+
+.open-book.has-three .paper {
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+
+.open-book.has-three .paper-noise {
+  display: none;
+}
+
+.open-book.has-three .left-content,
+.open-book.has-three .answer-content,
+.open-book.has-three .paper-page {
+  opacity: 0;
+}
+
 .open-book::before {
   position: absolute;
   z-index: 0;
