@@ -25,6 +25,7 @@ const elements = {
   soundLabel: document.querySelector("#soundLabel"),
   statusText: document.querySelector("#statusText"),
   swipeMode: document.querySelector("#swipeMode"),
+  thickPageBlock: document.querySelector("#thickPageBlock"),
   sheetBackAnswer: document.querySelector("#sheetBackAnswer"),
   sheetBackNumber: document.querySelector("#sheetBackNumber"),
   sheetBackPage: document.querySelector("#sheetBackPage"),
@@ -51,6 +52,8 @@ const state = {
   navigationToken: 0,
   scrubPointerId: null,
   scrubTargetIndex: 0,
+  trackPointerStartX: 0,
+  trackPointerMoved: false,
   soundEnabled: true
 };
 
@@ -118,12 +121,31 @@ function paintSheetAnswer(index, side) {
 function showAnswer(index, { animate = true } = {}) {
   state.currentIndex = normalizedIndex(index);
   paintMainAnswer(state.currentIndex);
+  updateBookThickness(state.currentIndex);
 
   if (animate) {
     elements.answerContent.classList.remove("answer-change");
     void elements.answerContent.offsetWidth;
     elements.answerContent.classList.add("answer-change");
   }
+}
+
+function updateBookThickness(index) {
+  if (state.answers.length <= 1) return;
+  const ratio = normalizedIndex(index) / (state.answers.length - 1);
+  const minimumDepth = 4;
+  const maximumExtraDepth = 13;
+  const leftDepth = minimumDepth + ratio * maximumExtraDepth;
+  const rightDepth = minimumDepth + (1 - ratio) * maximumExtraDepth;
+
+  elements.openBook.style.setProperty(
+    "--left-stack-depth",
+    `${leftDepth.toFixed(2)}px`
+  );
+  elements.openBook.style.setProperty(
+    "--right-stack-depth",
+    `${rightDepth.toFixed(2)}px`
+  );
 }
 
 function setFlipTransform(progress, duration = 0) {
@@ -184,6 +206,7 @@ async function animatePreparedFlip(complete, duration, { quiet = false } = {}) {
   if (complete) {
     state.currentIndex = state.flipTargetIndex;
     paintMainAnswer(state.currentIndex);
+    updateBookThickness(state.currentIndex);
     if (!quiet) {
       playPageSound();
       vibrate(5);
@@ -225,7 +248,129 @@ function revealAnswer() {
   elements.answerContent.classList.add("answer-reveal");
 }
 
-async function navigateToIndex(targetIndex) {
+function beginNavigation(target) {
+  state.isAnimating = true;
+  elements.openBook.classList.add("is-seeking");
+  elements.pageNavigator.classList.add("is-turning");
+  elements.pageTrackInstruction.textContent =
+    `正在翻到第 ${pageLabel(state.answers[target])} 页`;
+}
+
+function finishNavigation(target) {
+  state.currentIndex = target;
+  paintMainAnswer(target);
+  updateBookThickness(target);
+  elements.openBook.classList.remove("is-seeking", "is-block-turning");
+  elements.pageNavigator.classList.remove("is-turning");
+  elements.pageTrackInstruction.textContent = "滑动薄页 · 点击翻动厚页";
+  revealAnswer();
+  playSettleSound();
+  vibrate(8);
+  state.isAnimating = false;
+}
+
+async function navigateWithLeaves(target, navigationToken) {
+  const startIndex = state.currentIndex;
+  const distance = target - startIndex;
+  const direction = Math.sign(distance);
+  const flipCount = Math.min(16, Math.max(1, Math.abs(distance)));
+
+  for (let step = 1; step <= flipCount; step += 1) {
+    if (
+      navigationToken !== state.navigationToken ||
+      !state.isOpen
+    ) {
+      return false;
+    }
+
+    const progress = step / flipCount;
+    let intermediateIndex =
+      step === flipCount
+        ? target
+        : Math.round(startIndex + distance * progress);
+
+    if (intermediateIndex === state.currentIndex) {
+      intermediateIndex = normalizedIndex(state.currentIndex + direction);
+    }
+
+    const edgeSlowdown = step === 1 || step === flipCount ? 45 : 0;
+    const duration = Math.max(105, 172 - flipCount * 3) + edgeSlowdown;
+
+    await runAutomaticFlip(
+      direction,
+      intermediateIndex,
+      duration,
+      { quiet: step !== flipCount }
+    );
+    if (step !== flipCount) await wait(18);
+  }
+
+  return true;
+}
+
+function resetThickBlock() {
+  elements.thickPageBlock.classList.remove("is-active");
+  elements.thickPageBlock.setAttribute("aria-hidden", "true");
+  elements.thickPageBlock.style.transition = "none";
+  elements.thickPageBlock.style.transform = "";
+  delete elements.thickPageBlock.dataset.direction;
+}
+
+async function navigateWithPageBlock(target, navigationToken) {
+  const startIndex = state.currentIndex;
+  const distance = target - startIndex;
+  const direction = Math.sign(distance);
+  const distanceRatio = Math.abs(distance) / (state.answers.length - 1);
+  const depth = 12 + Math.min(22, 8 + distanceRatio * 28);
+  const duration = 920 + Math.round(distanceRatio * 260);
+  const angle = direction > 0 ? -180 : 180;
+  const uprightAngle = direction > 0 ? -88 : 88;
+  const firstPhase = Math.round(duration * 0.48);
+  const secondPhase = duration - firstPhase;
+
+  elements.openBook.style.setProperty("--block-depth", `${depth.toFixed(1)}px`);
+  elements.openBook.style.setProperty(
+    "--block-half-depth",
+    `${(depth / 2).toFixed(1)}px`
+  );
+  elements.openBook.classList.add("is-block-turning");
+  elements.thickPageBlock.dataset.direction =
+    direction > 0 ? "forward" : "backward";
+  elements.thickPageBlock.classList.add("is-active");
+  elements.thickPageBlock.setAttribute("aria-hidden", "false");
+  elements.thickPageBlock.style.transition = "none";
+  elements.thickPageBlock.style.transform = "rotateY(0deg) translateZ(4px)";
+  void elements.thickPageBlock.offsetWidth;
+  elements.thickPageBlock.style.transition =
+    `transform ${firstPhase}ms cubic-bezier(0.34, 0.02, 0.58, 1)`;
+  elements.thickPageBlock.style.transform =
+    `rotateY(${uprightAngle}deg) translateZ(4px)`;
+  playBlockSound(depth);
+
+  await wait(firstPhase + 55);
+  if (
+    navigationToken !== state.navigationToken ||
+    !state.isOpen
+  ) {
+    resetThickBlock();
+    return false;
+  }
+
+  state.currentIndex = target;
+  paintMainAnswer(target);
+  updateBookThickness(target);
+
+  elements.thickPageBlock.style.transition =
+    `transform ${secondPhase}ms cubic-bezier(0.38, 0, 0.22, 1)`;
+  elements.thickPageBlock.style.transform =
+    `rotateY(${angle}deg) translateZ(4px)`;
+
+  await wait(secondPhase + 32);
+  resetThickBlock();
+  return navigationToken === state.navigationToken && state.isOpen;
+}
+
+async function navigateToIndex(targetIndex, { interaction = "drag" } = {}) {
   if (
     !state.isOpen ||
     state.mode !== "swipe" ||
@@ -240,70 +385,20 @@ async function navigateToIndex(targetIndex) {
   if (target === state.currentIndex) {
     elements.openBook.classList.remove("is-seeking");
     elements.pageNavigator.classList.remove("is-turning");
-    elements.pageTrackInstruction.textContent = "滑动或轻点某一处";
+    elements.pageTrackInstruction.textContent = "滑动薄页 · 点击翻动厚页";
     revealAnswer();
     return;
   }
 
-  state.isAnimating = true;
   const navigationToken = ++state.navigationToken;
-  const startIndex = state.currentIndex;
-  const distance = target - startIndex;
-  const direction = Math.sign(distance);
-  const flipCount = Math.min(
-    9,
-    Math.max(1, Math.ceil(Math.log2(Math.abs(distance) + 1) * 1.45))
-  );
+  beginNavigation(target);
+  const completed =
+    interaction === "click"
+      ? await navigateWithPageBlock(target, navigationToken)
+      : await navigateWithLeaves(target, navigationToken);
 
-  elements.openBook.classList.add("is-seeking");
-  elements.pageNavigator.classList.add("is-turning");
-  elements.pageTrackInstruction.textContent =
-    `正在翻到第 ${pageLabel(state.answers[target])} 页`;
-
-  for (let step = 1; step <= flipCount; step += 1) {
-    if (
-      navigationToken !== state.navigationToken ||
-      !state.isOpen
-    ) {
-      return;
-    }
-
-    const progress = step / flipCount;
-    const easedProgress = 1 - Math.pow(1 - progress, 1.35);
-    let intermediateIndex =
-      step === flipCount
-        ? target
-        : Math.round(startIndex + distance * easedProgress);
-
-    if (intermediateIndex === state.currentIndex) {
-      intermediateIndex = normalizedIndex(state.currentIndex + direction);
-    }
-
-    const edgeSlowdown =
-      step === 1 || step === flipCount ? 75 : 0;
-    const duration =
-      Math.max(115, 205 - flipCount * 7) + edgeSlowdown;
-
-    await runAutomaticFlip(
-      direction,
-      intermediateIndex,
-      duration,
-      { quiet: step !== flipCount }
-    );
-    if (step !== flipCount) await wait(28);
-  }
-
-  if (navigationToken !== state.navigationToken) return;
-
-  state.currentIndex = target;
-  paintMainAnswer(target);
-  elements.openBook.classList.remove("is-seeking");
-  elements.pageNavigator.classList.remove("is-turning");
-  elements.pageTrackInstruction.textContent = "滑动或轻点某一处";
-  revealAnswer();
-  playSettleSound();
-  vibrate(8);
-  state.isAnimating = false;
+  if (!completed || navigationToken !== state.navigationToken) return;
+  finishNavigation(target);
 }
 
 function targetIndexFromClientX(clientX) {
@@ -316,7 +411,7 @@ function updateScrubPosition(clientX) {
   const target = targetIndexFromClientX(clientX);
   updateNavigator(target);
   elements.pageTrackInstruction.textContent =
-    `松手后翻到第 ${pageLabel(state.answers[target])} 页`;
+    `松手后逐页翻到第 ${pageLabel(state.answers[target])} 页`;
 }
 
 function onTrackPointerDown(event) {
@@ -329,22 +424,50 @@ function onTrackPointerDown(event) {
   }
 
   state.scrubPointerId = event.pointerId;
+  state.trackPointerStartX = event.clientX;
+  state.trackPointerMoved = false;
   elements.pageTrack.setPointerCapture(event.pointerId);
-  elements.pageNavigator.classList.add("is-scrubbing");
-  elements.openBook.classList.add("is-seeking");
-  updateScrubPosition(event.clientX);
 }
 
 function onTrackPointerMove(event) {
   if (event.pointerId !== state.scrubPointerId) return;
+  if (
+    !state.trackPointerMoved &&
+    Math.abs(event.clientX - state.trackPointerStartX) >= 7
+  ) {
+    state.trackPointerMoved = true;
+    elements.pageNavigator.classList.add("is-scrubbing");
+    elements.openBook.classList.add("is-seeking");
+  }
+  if (!state.trackPointerMoved) return;
   updateScrubPosition(event.clientX);
 }
 
 function onTrackPointerEnd(event) {
   if (event.pointerId !== state.scrubPointerId) return;
   state.scrubPointerId = null;
+  if (event.type === "pointercancel") {
+    state.trackPointerMoved = false;
+    elements.pageNavigator.classList.remove("is-scrubbing");
+    elements.openBook.classList.remove("is-seeking");
+    updateNavigator(state.currentIndex);
+    elements.pageTrackInstruction.textContent = "滑动薄页 · 点击翻动厚页";
+    return;
+  }
+
+  if (!state.trackPointerMoved) {
+    const target = targetIndexFromClientX(event.clientX);
+    updateNavigator(target);
+    elements.openBook.classList.add("is-seeking");
+    elements.pageTrackInstruction.textContent =
+      `打开厚书页到第 ${pageLabel(state.answers[target])} 页`;
+    void navigateToIndex(target, { interaction: "click" });
+    return;
+  }
+
   elements.pageNavigator.classList.remove("is-scrubbing");
-  void navigateToIndex(state.scrubTargetIndex);
+  state.trackPointerMoved = false;
+  void navigateToIndex(state.scrubTargetIndex, { interaction: "drag" });
 }
 
 function onTrackKeyDown(event) {
@@ -363,7 +486,7 @@ function onTrackKeyDown(event) {
 
   if (!(event.key in keyTargets)) return;
   event.preventDefault();
-  void navigateToIndex(keyTargets[event.key]);
+  void navigateToIndex(keyTargets[event.key], { interaction: "drag" });
 }
 
 function showModePicker() {
@@ -413,7 +536,8 @@ function openBook(mode) {
     requestAnimationFrame(() => {
       elements.pageNavigator.classList.add("is-visible");
     });
-    elements.statusText.textContent = "滑动或轻点书下方的轨道，选择想停下的位置";
+    elements.pageTrackInstruction.textContent = "滑动薄页 · 点击翻动厚页";
+    elements.statusText.textContent = "拖动会逐页翻动，轻点会打开一叠厚书页";
   }
 
   playOpenSound();
@@ -427,8 +551,10 @@ function closeBook() {
   state.mode = null;
   state.navigationToken += 1;
   state.scrubPointerId = null;
+  state.trackPointerMoved = false;
   state.isAnimating = false;
   resetFlip();
+  resetThickBlock();
   elements.book.dataset.state = "closed";
   elements.openBook.setAttribute("aria-hidden", "true");
   elements.openBook.classList.remove("is-seeking");
@@ -442,7 +568,7 @@ function closeBook() {
 }
 
 async function turnOnePage(direction) {
-  void navigateToIndex(state.currentIndex + direction);
+  void navigateToIndex(state.currentIndex + direction, { interaction: "drag" });
 }
 
 function ensureAudio() {
@@ -504,6 +630,23 @@ function playSettleSound() {
   playTone({ frequency: 270, duration: 0.08, gain: 0.013, type: "sine" });
 }
 
+function playBlockSound(depth) {
+  const weight = Math.min(1, depth / 34);
+  playTone({
+    frequency: 115 + weight * 25,
+    duration: 0.42,
+    gain: 0.025 + weight * 0.012,
+    type: "triangle"
+  });
+  playTone({
+    frequency: 185 + weight * 30,
+    duration: 0.3,
+    gain: 0.012,
+    type: "sine",
+    delay: 0.16
+  });
+}
+
 function vibrate(duration) {
   if ("vibrate" in navigator) navigator.vibrate(duration);
 }
@@ -540,7 +683,7 @@ async function init() {
       if (state.mode === "random") {
         showAnswer(randomIndex());
       } else {
-        void navigateToIndex(randomIndex());
+        void navigateToIndex(randomIndex(), { interaction: "click" });
       }
     });
 

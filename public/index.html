@@ -9,8 +9,8 @@
       content="阿祈的答案之书——触碰开启，或滑动书页，在停下的地方遇见答案。"
     />
     <title>阿祈的答案之书</title>
-    <link rel="stylesheet" href="/styles.css?v=4" />
-    <script type="module" src="/app.js?v=4"></script>
+    <link rel="stylesheet" href="/styles.css?v=5" />
+    <script type="module" src="/app.js?v=5"></script>
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
@@ -52,6 +52,8 @@
           </div>
 
           <div class="open-book" id="openBook" aria-hidden="true">
+            <div class="page-stack page-stack-left" id="leftPageStack" aria-hidden="true"></div>
+            <div class="page-stack page-stack-right" id="rightPageStack" aria-hidden="true"></div>
             <div class="book-spine" aria-hidden="true"></div>
 
             <div class="paper left-paper">
@@ -104,6 +106,18 @@
                 <span class="paper-page" id="sheetBackPage"></span>
               </div>
               <span class="page-curl-light" aria-hidden="true"></span>
+            </div>
+
+            <div class="thick-page-block" id="thickPageBlock" aria-hidden="true">
+              <div class="thick-block-face thick-block-front">
+                <div class="paper-noise"></div>
+                <span class="thick-block-mark">✦</span>
+              </div>
+              <div class="thick-block-face thick-block-back">
+                <div class="paper-noise"></div>
+              </div>
+              <div class="thick-block-edge" aria-hidden="true"></div>
+              <div class="thick-block-bottom" aria-hidden="true"></div>
             </div>
           </div>
           </div>
