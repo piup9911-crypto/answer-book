@@ -19,7 +19,14 @@ const elements = {
   soundLabel: document.querySelector("#soundLabel"),
   statusText: document.querySelector("#statusText"),
   swipeMode: document.querySelector("#swipeMode"),
-  turningPageNumber: document.querySelector("#turningPageNumber"),
+  sheetBackAnswer: document.querySelector("#sheetBackAnswer"),
+  sheetBackNumber: document.querySelector("#sheetBackNumber"),
+  sheetBackPage: document.querySelector("#sheetBackPage"),
+  sheetBackText: document.querySelector("#sheetBackText"),
+  sheetFrontAnswer: document.querySelector("#sheetFrontAnswer"),
+  sheetFrontNumber: document.querySelector("#sheetFrontNumber"),
+  sheetFrontPage: document.querySelector("#sheetFrontPage"),
+  sheetFrontText: document.querySelector("#sheetFrontText"),
   turningSheet: document.querySelector("#turningSheet"),
   turnSurface: document.querySelector("#turnSurface")
 };
@@ -35,11 +42,12 @@ const state = {
   pointerLastX: 0,
   pointerLastTime: 0,
   pointerVelocity: 0,
-  dragRemainder: 0,
-  inertiaFrame: null,
+  flipDirection: 0,
+  flipProgress: 0,
+  flipTargetIndex: 0,
+  isAnimating: false,
   isOpen: false,
-  soundEnabled: true,
-  turnAnimationTimer: null
+  soundEnabled: true
 };
 
 function randomIndex() {
@@ -62,35 +70,149 @@ function pageLabel(answer) {
   return String(answer.page || answer.id).padStart(3, "0");
 }
 
-function showAnswer(index, { animate = true, direction = 1 } = {}) {
+function normalizedIndex(index) {
   const length = state.answers.length;
-  state.currentIndex = ((index % length) + length) % length;
-  const answer = state.answers[state.currentIndex];
+  return ((index % length) + length) % length;
+}
+
+function paintAnswer(answer, textNode, numberNode, pageNode) {
   const label = pageLabel(answer);
 
-  elements.answerText.textContent = answer.text;
-  elements.answerNumber.textContent = `ANSWER · ${label}`;
-  elements.pageNumber.textContent = label;
-  elements.turningPageNumber.textContent = label;
+  textNode.textContent = answer.text;
+  numberNode.textContent = `ANSWER · ${label}`;
+  pageNode.textContent = label;
+}
+
+function paintMainAnswer(index) {
+  paintAnswer(
+    state.answers[normalizedIndex(index)],
+    elements.answerText,
+    elements.answerNumber,
+    elements.pageNumber
+  );
+}
+
+function paintSheetAnswer(index, side) {
+  const answer = state.answers[normalizedIndex(index)];
+  if (side === "front") {
+    paintAnswer(
+      answer,
+      elements.sheetFrontText,
+      elements.sheetFrontNumber,
+      elements.sheetFrontPage
+    );
+    return;
+  }
+  paintAnswer(
+    answer,
+    elements.sheetBackText,
+    elements.sheetBackNumber,
+    elements.sheetBackPage
+  );
+}
+
+function showAnswer(index, { animate = true } = {}) {
+  state.currentIndex = normalizedIndex(index);
+  paintMainAnswer(state.currentIndex);
 
   if (animate) {
     elements.answerContent.classList.remove("answer-change");
     void elements.answerContent.offsetWidth;
     elements.answerContent.classList.add("answer-change");
-    animatePageTurn(direction);
   }
 }
 
-function animatePageTurn(direction) {
-  clearTimeout(state.turnAnimationTimer);
-  const className = direction >= 0 ? "is-turning" : "is-turning-back";
-  elements.turningSheet.classList.remove("is-turning", "is-turning-back");
-  void elements.turningSheet.offsetWidth;
-  elements.turningSheet.classList.add(className);
-  state.turnAnimationTimer = setTimeout(() => {
-    elements.turningSheet.classList.remove(className);
-  }, 230);
-  playPageSound();
+function setFlipTransform(progress, duration = 0) {
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+  const angle = -180 * state.flipDirection * clampedProgress;
+  const shadow = Math.sin(clampedProgress * Math.PI);
+  elements.turningSheet.style.transition =
+    duration > 0
+      ? `transform ${duration}ms cubic-bezier(0.2, 0.78, 0.24, 1)`
+      : "none";
+  elements.turningSheet.style.setProperty("--flip-shadow", shadow.toFixed(3));
+  elements.turningSheet.style.transform =
+    `rotateY(${angle}deg) translateZ(2px)`;
+  state.flipProgress = clampedProgress;
+}
+
+function prepareFlip(direction) {
+  state.flipDirection = direction;
+  state.flipTargetIndex = normalizedIndex(state.currentIndex + direction);
+  elements.turningSheet.dataset.direction =
+    direction > 0 ? "forward" : "backward";
+
+  if (direction > 0) {
+    paintSheetAnswer(state.currentIndex, "front");
+    paintSheetAnswer(state.flipTargetIndex, "back");
+    paintMainAnswer(state.flipTargetIndex);
+  } else {
+    paintSheetAnswer(state.currentIndex, "front");
+    paintSheetAnswer(state.flipTargetIndex, "back");
+    paintMainAnswer(state.currentIndex);
+  }
+
+  elements.turningSheet.classList.add("is-active");
+  elements.turningSheet.setAttribute("aria-hidden", "false");
+  setFlipTransform(0);
+}
+
+function resetFlip({ restoreCurrent = true } = {}) {
+  if (restoreCurrent) paintMainAnswer(state.currentIndex);
+  elements.turningSheet.classList.remove("is-active");
+  elements.turningSheet.setAttribute("aria-hidden", "true");
+  elements.turningSheet.style.transition = "none";
+  elements.turningSheet.style.transform = "";
+  elements.turningSheet.style.removeProperty("--flip-shadow");
+  delete elements.turningSheet.dataset.direction;
+  state.flipDirection = 0;
+  state.flipProgress = 0;
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function animatePreparedFlip(complete, duration) {
+  setFlipTransform(complete ? 1 : 0, duration);
+  await wait(duration + 24);
+
+  if (complete) {
+    state.currentIndex = state.flipTargetIndex;
+    paintMainAnswer(state.currentIndex);
+    playPageSound();
+    vibrate(5);
+  }
+
+  resetFlip({ restoreCurrent: !complete });
+}
+
+async function runAutomaticFlip(direction) {
+  prepareFlip(direction);
+  await wait(32);
+  await animatePreparedFlip(true, 390);
+}
+
+async function settleFlip(complete, extraPages = 0) {
+  if (!state.flipDirection || state.isAnimating) return;
+  state.isAnimating = true;
+  const direction = state.flipDirection;
+  const remaining = complete
+    ? 1 - state.flipProgress
+    : state.flipProgress;
+  const duration = Math.max(170, Math.round(430 * remaining));
+
+  await animatePreparedFlip(complete, duration);
+
+  if (complete) {
+    for (let page = 0; page < extraPages && state.isOpen; page += 1) {
+      await wait(55);
+      await runAutomaticFlip(direction);
+    }
+    playSettleSound();
+  }
+
+  state.isAnimating = false;
 }
 
 function showModePicker() {
@@ -117,7 +239,7 @@ function openBook(mode) {
   state.mode = mode;
   state.isOpen = true;
   hideModePicker();
-  cancelInertia();
+  resetFlip();
 
   const startingIndex = randomIndex();
   showAnswer(startingIndex, { animate: false });
@@ -130,10 +252,12 @@ function openBook(mode) {
 
   if (mode === "random") {
     elements.questionCopy.textContent = "你问过的问题，已经被这一页听见";
+    elements.openBook.classList.remove("swipe-enabled");
     elements.turnSurface.style.cursor = "default";
     elements.statusText.textContent = "轻触“再问一次”，可以重新抽取答案";
   } else {
     elements.questionCopy.textContent = "向左或向右滑动书页，松手后让它停下";
+    elements.openBook.classList.add("swipe-enabled");
     elements.turnSurface.style.cursor = "grab";
     elements.statusText.textContent = "左右滑动右侧书页，速度越快，翻得越远";
   }
@@ -148,9 +272,11 @@ function closeBook() {
   state.isOpen = false;
   state.mode = null;
   state.pointerId = null;
-  cancelInertia();
+  state.isAnimating = false;
+  resetFlip();
   elements.book.dataset.state = "closed";
   elements.openBook.setAttribute("aria-hidden", "true");
+  elements.openBook.classList.remove("swipe-enabled");
   elements.openActions.hidden = true;
   elements.openActions.style.display = "";
   elements.statusText.hidden = false;
@@ -158,23 +284,36 @@ function closeBook() {
   playCloseSound();
 }
 
-function turnPages(count) {
-  if (!count) return;
-  const direction = Math.sign(count);
-  showAnswer(state.currentIndex + count, { direction });
-  vibrate(Math.abs(count) > 4 ? 8 : 4);
+async function turnOnePage(direction) {
+  if (
+    !state.isOpen ||
+    state.mode !== "swipe" ||
+    state.isAnimating ||
+    state.pointerId !== null
+  ) {
+    return;
+  }
+  state.isAnimating = true;
+  await runAutomaticFlip(direction);
+  playSettleSound();
+  state.isAnimating = false;
 }
 
 function onPointerDown(event) {
-  if (!state.isOpen || state.mode !== "swipe" || state.pointerId !== null) return;
-  cancelInertia();
+  if (
+    !state.isOpen ||
+    state.mode !== "swipe" ||
+    state.pointerId !== null ||
+    state.isAnimating
+  ) {
+    return;
+  }
   state.pointerId = event.pointerId;
   state.pointerStartX = event.clientX;
   state.pointerLastX = event.clientX;
   state.pointerLastTime = performance.now();
   state.pointerVelocity = 0;
-  state.dragRemainder = 0;
-  elements.turnSurface.setPointerCapture(event.pointerId);
+  elements.openBook.setPointerCapture(event.pointerId);
 }
 
 function onPointerMove(event) {
@@ -184,17 +323,19 @@ function onPointerMove(event) {
   const deltaX = event.clientX - state.pointerLastX;
   const deltaTime = Math.max(8, now - state.pointerLastTime);
   state.pointerVelocity = state.pointerVelocity * 0.55 + (deltaX / deltaTime) * 0.45;
-  state.dragRemainder += deltaX;
+  const totalDelta = event.clientX - state.pointerStartX;
 
-  const threshold = 13;
-  const pageDelta = Math.trunc(state.dragRemainder / threshold);
-  if (pageDelta !== 0) {
-    turnPages(-pageDelta);
-    state.dragRemainder -= pageDelta * threshold;
+  if (Math.abs(totalDelta) > 3) {
+    const direction = totalDelta < 0 ? 1 : -1;
+    if (direction !== state.flipDirection) {
+      if (state.flipDirection) resetFlip();
+      prepareFlip(direction);
+    }
+
+    const pageWidth = Math.max(1, elements.openBook.clientWidth / 2);
+    const progress = Math.min(0.985, Math.abs(totalDelta) / (pageWidth * 0.88));
+    setFlipTransform(progress);
   }
-
-  const bend = Math.max(-10, Math.min(10, deltaX * -0.35));
-  elements.turnSurface.style.transform = `rotateY(${bend}deg)`;
   state.pointerLastX = event.clientX;
   state.pointerLastTime = now;
 }
@@ -202,50 +343,16 @@ function onPointerMove(event) {
 function onPointerEnd(event) {
   if (event.pointerId !== state.pointerId) return;
   state.pointerId = null;
-  elements.turnSurface.style.transform = "";
+  if (!state.flipDirection) return;
 
-  const velocity = -state.pointerVelocity;
-  if (Math.abs(velocity) > 0.09) {
-    startInertia(velocity);
-  } else {
-    playSettleSound();
-  }
-}
-
-function startInertia(initialVelocity) {
-  cancelInertia();
-  let velocity = Math.max(-2.4, Math.min(2.4, initialVelocity));
-  let accumulator = 0;
-  let previousTime = performance.now();
-
-  const tick = (now) => {
-    const elapsed = Math.min(34, now - previousTime);
-    previousTime = now;
-    accumulator += velocity * elapsed * 0.12;
-
-    const wholePages = Math.trunc(accumulator);
-    if (wholePages !== 0) {
-      turnPages(wholePages);
-      accumulator -= wholePages;
-    }
-
-    velocity *= Math.pow(0.92, elapsed / 16.67);
-    if (Math.abs(velocity) > 0.045) {
-      state.inertiaFrame = requestAnimationFrame(tick);
-    } else {
-      state.inertiaFrame = null;
-      playSettleSound();
-    }
-  };
-
-  state.inertiaFrame = requestAnimationFrame(tick);
-}
-
-function cancelInertia() {
-  if (state.inertiaFrame) {
-    cancelAnimationFrame(state.inertiaFrame);
-    state.inertiaFrame = null;
-  }
+  const directedVelocity =
+    -state.pointerVelocity * state.flipDirection;
+  const complete =
+    state.flipProgress >= 0.42 || directedVelocity > 0.38;
+  const extraPages = complete
+    ? Math.min(3, Math.max(0, Math.floor((directedVelocity - 0.8) * 1.4)))
+    : 0;
+  void settleFlip(complete, extraPages);
 }
 
 function ensureAudio() {
@@ -340,26 +447,25 @@ async function init() {
     elements.closeButton.addEventListener("click", closeBook);
     elements.soundButton.addEventListener("click", toggleSound);
     elements.againButton.addEventListener("click", () => {
-      cancelInertia();
       if (state.mode === "random") {
         showAnswer(randomIndex());
       } else {
-        turnPages(Math.random() < 0.5 ? -1 : 1);
+        void turnOnePage(1);
       }
     });
 
-    elements.turnSurface.addEventListener("pointerdown", onPointerDown);
-    elements.turnSurface.addEventListener("pointermove", onPointerMove);
-    elements.turnSurface.addEventListener("pointerup", onPointerEnd);
-    elements.turnSurface.addEventListener("pointercancel", onPointerEnd);
+    elements.openBook.addEventListener("pointerdown", onPointerDown);
+    elements.openBook.addEventListener("pointermove", onPointerMove);
+    elements.openBook.addEventListener("pointerup", onPointerEnd);
+    elements.openBook.addEventListener("pointercancel", onPointerEnd);
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         if (state.modePickerOpen) hideModePicker();
         else if (state.isOpen) closeBook();
       }
       if (state.isOpen && state.mode === "swipe") {
-        if (event.key === "ArrowLeft") turnPages(-1);
-        if (event.key === "ArrowRight") turnPages(1);
+        if (event.key === "ArrowLeft") void turnOnePage(-1);
+        if (event.key === "ArrowRight") void turnOnePage(1);
       }
     });
 

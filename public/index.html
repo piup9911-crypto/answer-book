@@ -10,7 +10,7 @@
     />
     <title>阿祈的答案之书</title>
     <link rel="stylesheet" href="/styles.css" />
-    <script type="module" src="/app.js?v=2"></script>
+    <script type="module" src="/app.js?v=3"></script>
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
@@ -73,11 +73,36 @@
               </div>
               <span class="paper-page" id="pageNumber"></span>
 
-              <div class="turning-sheet" id="turningSheet" aria-hidden="true">
-                <div class="turning-sheet-face">
-                  <span id="turningPageNumber"></span>
+            </div>
+
+            <div class="turning-sheet" id="turningSheet" aria-hidden="true">
+              <div class="sheet-face sheet-front">
+                <div class="paper-noise"></div>
+                <div class="sheet-answer" id="sheetFrontAnswer">
+                  <p class="answer-text" id="sheetFrontText"></p>
+                  <span class="answer-rule"></span>
+                  <p class="answer-number" id="sheetFrontNumber"></p>
                 </div>
+                <div class="sheet-whisper" id="sheetFrontWhisper">
+                  <span class="small-star">✦</span>
+                  <span>让这一页慢慢落下</span>
+                </div>
+                <span class="paper-page" id="sheetFrontPage"></span>
               </div>
+              <div class="sheet-face sheet-back">
+                <div class="paper-noise"></div>
+                <div class="sheet-answer" id="sheetBackAnswer">
+                  <p class="answer-text" id="sheetBackText"></p>
+                  <span class="answer-rule"></span>
+                  <p class="answer-number" id="sheetBackNumber"></p>
+                </div>
+                <div class="sheet-whisper" id="sheetBackWhisper">
+                  <span class="small-star">✦</span>
+                  <span>答案就在下一页</span>
+                </div>
+                <span class="paper-page" id="sheetBackPage"></span>
+              </div>
+              <span class="page-curl-light" aria-hidden="true"></span>
             </div>
           </div>
         </div>
