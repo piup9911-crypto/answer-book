@@ -1,0 +1,15 @@
+{
+  "name": "aqi-answer-book",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "node scripts/check.mjs",
+    "deploy": "npm run check && wrangler deploy",
+    "deploy:dry-run": "npm run check && wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "^4.111.0"
+  }
+}

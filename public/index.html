@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#111b2b" />
+    <meta
+      name="description"
+      content="阿祈的答案之书——触碰开启，或滑动书页，在停下的地方遇见答案。"
+    />
+    <title>阿祈的答案之书</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true">
+      <span class="glow glow-one"></span>
+      <span class="glow glow-two"></span>
+      <span class="grain"></span>
+    </div>
+
+    <main class="app">
+      <header class="masthead">
+        <p class="eyebrow">A BOOK FOR YOUR QUESTION</p>
+        <button class="sound-button" id="soundButton" type="button" aria-pressed="true">
+          <span class="sound-dot" aria-hidden="true"></span>
+          <span id="soundLabel">声音开</span>
+        </button>
+      </header>
+
+      <section class="book-scene" id="bookScene" aria-live="polite">
+        <div class="book-shadow" aria-hidden="true"></div>
+
+        <div class="book" id="book" data-state="closed">
+          <div class="closed-book" id="closedBook">
+            <div class="page-block" aria-hidden="true"></div>
+            <button class="front-cover" id="coverButton" type="button" aria-label="打开模式选择">
+              <span class="cover-border cover-border-outer"></span>
+              <span class="cover-border cover-border-inner"></span>
+              <span class="corner corner-tl"></span>
+              <span class="corner corner-tr"></span>
+              <span class="corner corner-bl"></span>
+              <span class="corner corner-br"></span>
+              <span class="cover-star" aria-hidden="true">✦</span>
+              <span class="cover-kicker">THE BOOK OF</span>
+              <span class="cover-title">答案之书</span>
+              <span class="cover-owner">阿祈</span>
+              <span class="cover-rule"></span>
+              <span class="cover-hint">轻触书封 · 选择开启方式</span>
+            </button>
+          </div>
+
+          <div class="open-book" id="openBook" aria-hidden="true">
+            <div class="book-spine" aria-hidden="true"></div>
+
+            <div class="paper left-paper">
+              <div class="paper-noise"></div>
+              <div class="left-content">
+                <span class="small-star">✦</span>
+                <p class="question-label">把问题留在心里</p>
+                <p class="question-copy" id="questionCopy">然后相信你翻到的这一页</p>
+                <span class="ornament">— ◆ —</span>
+              </div>
+              <span class="paper-page">AQI</span>
+            </div>
+
+            <div class="paper right-paper" id="turnSurface">
+              <div class="paper-noise"></div>
+              <div class="answer-content" id="answerContent">
+                <p class="answer-text" id="answerText"></p>
+                <span class="answer-rule"></span>
+                <p class="answer-number" id="answerNumber"></p>
+              </div>
+              <span class="paper-page" id="pageNumber"></span>
+
+              <div class="turning-sheet" id="turningSheet" aria-hidden="true">
+                <div class="turning-sheet-face">
+                  <span id="turningPageNumber"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-picker" id="modePicker" hidden>
+          <p class="mode-intro">你想怎样打开这本书？</p>
+          <div class="mode-actions">
+            <button class="mode-card" id="randomMode" type="button">
+              <span class="mode-icon">✦</span>
+              <span class="mode-name">触碰开启</span>
+              <span class="mode-description">轻触一下，让书替你选一页</span>
+            </button>
+            <button class="mode-card" id="swipeMode" type="button">
+              <span class="mode-icon mode-pages" aria-hidden="true">≋</span>
+              <span class="mode-name">滑动翻页</span>
+              <span class="mode-description">亲手翻动，停在哪里就看哪里</span>
+            </button>
+          </div>
+          <button class="mode-cancel" id="modeCancel" type="button">暂时不问</button>
+        </div>
+      </section>
+
+      <footer class="controls">
+        <p class="status" id="statusText">先想好一个问题，再触碰书封</p>
+        <div class="open-actions" id="openActions" hidden>
+          <button class="text-button" id="againButton" type="button">再问一次</button>
+          <span class="action-separator" aria-hidden="true"></span>
+          <button class="text-button" id="closeButton" type="button">合上书</button>
+        </div>
+      </footer>
+    </main>
+
+    <div class="loading-screen" id="loadingScreen">
+      <span class="loading-star">✦</span>
+      <p>正在整理书页</p>
+    </div>
+
+    <div class="error-toast" id="errorToast" role="alert" hidden></div>
+  </body>
+</html>
