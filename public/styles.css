@@ -383,6 +383,8 @@ button {
   filter: drop-shadow(0 27px 24px rgba(0, 0, 0, 0.38));
   transform: rotateX(14deg) scale(0.72);
   transform-style: preserve-3d;
+  touch-action: pan-y;
+  user-select: none;
   transition:
     opacity 600ms ease 180ms,
     transform 900ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -991,6 +993,10 @@ button {
 .book[data-state="opening"] .answer-content {
   opacity: 0;
   filter: blur(6px);
+}
+
+.open-book.is-page-swipe-ready {
+  cursor: grabbing;
 }
 
 .open-book.is-seeking .answer-content,

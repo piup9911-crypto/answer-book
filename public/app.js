@@ -40,8 +40,8 @@ const elements = {
 const state = {
   answers: [],
   audioContext: null,
-  currentIndex: 0,
-  mode: null,
+  currentIndex: -1,
+  openingMethod: null,
   coverPointerId: null,
   coverPointerStartX: 0,
   coverPointerStartY: 0,
@@ -53,6 +53,11 @@ const state = {
   isAnimating: false,
   isOpen: false,
   navigationToken: 0,
+  openPointerDirection: 0,
+  openPointerId: null,
+  openPointerStartX: 0,
+  openPointerStartY: 0,
+  suppressOpenClick: false,
   scrubPointerId: null,
   scrubTargetIndex: 0,
   trackPointerStartX: 0,
@@ -150,6 +155,7 @@ function showAnswer(index, { animate = true } = {}) {
   state.currentIndex = index < 0 ? -1 : normalizedIndex(index);
   paintMainAnswer(state.currentIndex);
   updateBookThickness(state.currentIndex);
+  updateNavigator(state.currentIndex);
 
   if (animate) {
     elements.answerContent.classList.remove("answer-change");
@@ -642,7 +648,6 @@ async function navigateWithPageBlock(target, navigationToken) {
 async function navigateToIndex(targetIndex, { interaction = "drag" } = {}) {
   if (
     !state.isOpen ||
-    state.mode !== "swipe" ||
     state.isAnimating
   ) {
     return;
@@ -685,7 +690,7 @@ function updateScrubPosition(clientX) {
 
 function onTrackPointerDown(event) {
   if (
-    state.mode !== "swipe" ||
+    !state.isOpen ||
     state.isAnimating ||
     state.scrubPointerId !== null
   ) {
@@ -740,7 +745,7 @@ function onTrackPointerEnd(event) {
 }
 
 function onTrackKeyDown(event) {
-  if (state.mode !== "swipe" || state.isAnimating) return;
+  if (!state.isOpen || state.isAnimating) return;
 
   const keyTargets = {
     ArrowLeft: state.scrubTargetIndex - 1,
@@ -758,13 +763,13 @@ function onTrackKeyDown(event) {
   void navigateToIndex(keyTargets[event.key], { interaction: "drag" });
 }
 
-function openBook(mode) {
+function openBook(openingMethod) {
   if (state.isOpen) return;
-  state.mode = mode;
+  state.openingMethod = openingMethod;
   state.isOpen = true;
   resetFlip();
 
-  const startingIndex = mode === "swipe" ? -1 : randomIndex();
+  const startingIndex = openingMethod === "swipe" ? -1 : randomIndex();
   showAnswer(startingIndex, { animate: false });
 
   elements.book.dataset.state = "opening";
@@ -773,19 +778,14 @@ function openBook(mode) {
   elements.openActions.style.display = "flex";
   elements.statusText.hidden = true;
 
-  if (mode === "random") {
+  if (openingMethod === "random") {
     elements.questionCopy.textContent = "你问过的问题，已经被这一页听见";
-    elements.pageNavigator.classList.remove("is-visible");
-    elements.pageNavigator.hidden = true;
+    elements.pageTrackInstruction.textContent =
+      `从第 ${indexLabel(state.currentIndex)} 页开始 · 滑动书页`;
     elements.statusText.textContent = "轻触“再问一次”，可以重新抽取答案";
   } else {
     elements.questionCopy.textContent =
       "从第零页开始，把书页停在你真正想停下的位置";
-    updateNavigator(state.currentIndex);
-    elements.pageNavigator.hidden = false;
-    requestAnimationFrame(() => {
-      elements.pageNavigator.classList.add("is-visible");
-    });
     elements.pageTrackInstruction.textContent = "从 000 开始 · 滑动薄页";
     elements.statusText.textContent = "拖动会逐页翻动，轻点会打开一叠厚书页";
   }
@@ -801,8 +801,11 @@ function openBook(mode) {
 
 function closeBook() {
   state.isOpen = false;
-  state.mode = null;
+  state.openingMethod = null;
   state.navigationToken += 1;
+  state.openPointerId = null;
+  state.openPointerDirection = 0;
+  state.suppressOpenClick = false;
   state.scrubPointerId = null;
   state.trackPointerMoved = false;
   state.isAnimating = false;
@@ -810,18 +813,78 @@ function closeBook() {
   resetThickBlock();
   elements.book.dataset.state = "closed";
   elements.openBook.setAttribute("aria-hidden", "true");
-  elements.openBook.classList.remove("is-seeking");
-  elements.pageNavigator.classList.remove("is-visible", "is-scrubbing", "is-turning");
-  elements.pageNavigator.hidden = true;
+  elements.openBook.classList.remove("is-seeking", "is-page-swipe-ready");
+  elements.pageNavigator.classList.remove("is-scrubbing", "is-turning");
+  elements.pageTrackInstruction.textContent = "打开书后可滑动或轻点";
   elements.openActions.hidden = true;
   elements.openActions.style.display = "";
   elements.statusText.hidden = false;
-  elements.statusText.textContent = "轻触随机开启 · 向左滑动进入翻页";
+  elements.statusText.textContent = "轻触随机开启 · 向左滑动从 000 开始";
   playCloseSound();
 }
 
 async function turnOnePage(direction) {
   void navigateToIndex(state.currentIndex + direction, { interaction: "drag" });
+}
+
+function onOpenBookPointerDown(event) {
+  if (
+    !state.isOpen ||
+    state.isAnimating ||
+    elements.book.dataset.state !== "open" ||
+    state.openPointerId !== null
+  ) {
+    return;
+  }
+
+  const rect = elements.openBook.getBoundingClientRect();
+  state.openPointerId = event.pointerId;
+  state.openPointerStartX = event.clientX;
+  state.openPointerStartY = event.clientY;
+  state.openPointerDirection =
+    event.clientX < rect.left + rect.width / 2 ? -1 : 1;
+  elements.book.setPointerCapture(event.pointerId);
+}
+
+function onOpenBookPointerMove(event) {
+  if (event.pointerId !== state.openPointerId) return;
+  const deltaX = event.clientX - state.openPointerStartX;
+  const deltaY = event.clientY - state.openPointerStartY;
+  const isHorizontalSwipe =
+    Math.abs(deltaX) >= 18 &&
+    Math.abs(deltaX) > Math.abs(deltaY) * 1.15;
+
+  elements.openBook.classList.toggle("is-page-swipe-ready", isHorizontalSwipe);
+  if (isHorizontalSwipe && event.cancelable) event.preventDefault();
+}
+
+function resetOpenBookPointer() {
+  state.openPointerId = null;
+  state.openPointerDirection = 0;
+  elements.openBook.classList.remove("is-page-swipe-ready");
+}
+
+function onOpenBookPointerEnd(event) {
+  if (event.pointerId !== state.openPointerId) return;
+  const deltaX = event.clientX - state.openPointerStartX;
+  const deltaY = event.clientY - state.openPointerStartY;
+  const direction = state.openPointerDirection;
+  const shouldTurnPage =
+    event.type !== "pointercancel" &&
+    Math.abs(deltaX) >= 38 &&
+    Math.abs(deltaX) > Math.abs(deltaY) * 1.15;
+
+  if (shouldTurnPage) {
+    state.suppressOpenClick = true;
+    setTimeout(() => {
+      state.suppressOpenClick = false;
+    }, 500);
+    resetOpenBookPointer();
+    void turnOnePage(direction);
+    return;
+  }
+
+  resetOpenBookPointer();
 }
 
 function onCoverPointerDown(event) {
@@ -883,6 +946,10 @@ function onCoverClick() {
 }
 
 function onOpenBookClick(event) {
+  if (state.suppressOpenClick) {
+    state.suppressOpenClick = false;
+    return;
+  }
   if (
     !state.isOpen ||
     state.isAnimating ||
@@ -995,17 +1062,26 @@ async function init() {
       throw new Error("答案数据为空");
     }
     state.answers = answerBook.answers;
+    updateNavigator(-1);
+    elements.pageNavigator.hidden = false;
+    requestAnimationFrame(() => {
+      elements.pageNavigator.classList.add("is-visible");
+    });
 
     elements.coverButton.addEventListener("pointerdown", onCoverPointerDown);
     elements.coverButton.addEventListener("pointermove", onCoverPointerMove);
     elements.coverButton.addEventListener("pointerup", onCoverPointerEnd);
     elements.coverButton.addEventListener("pointercancel", onCoverPointerEnd);
     elements.coverButton.addEventListener("click", onCoverClick);
-    elements.openBook.addEventListener("click", onOpenBookClick);
+    elements.book.addEventListener("pointerdown", onOpenBookPointerDown);
+    elements.book.addEventListener("pointermove", onOpenBookPointerMove);
+    elements.book.addEventListener("pointerup", onOpenBookPointerEnd);
+    elements.book.addEventListener("pointercancel", onOpenBookPointerEnd);
+    elements.book.addEventListener("click", onOpenBookClick);
     elements.closeButton.addEventListener("click", closeBook);
     elements.soundButton.addEventListener("click", toggleSound);
     elements.againButton.addEventListener("click", () => {
-      if (state.mode === "random") {
+      if (state.openingMethod === "random") {
         showAnswer(randomIndex());
       } else {
         void navigateToIndex(randomIndex(), { interaction: "click" });
@@ -1021,7 +1097,7 @@ async function init() {
       if (event.key === "Escape") {
         if (state.isOpen) closeBook();
       }
-      if (state.isOpen && state.mode === "swipe") {
+      if (state.isOpen) {
         if (event.key === "ArrowLeft") void turnOnePage(-1);
         if (event.key === "ArrowRight") void turnOnePage(1);
       }
