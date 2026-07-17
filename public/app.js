@@ -333,6 +333,12 @@ function updateNavigator(index) {
   state.scrubTargetIndex = boundedIndex;
 }
 
+function setNavigatorVisible(visible) {
+  elements.pageNavigator.classList.toggle("is-visible", visible);
+  elements.pageNavigator.setAttribute("aria-hidden", String(!visible));
+  elements.pageNavigator.inert = !visible;
+}
+
 function revealAnswer() {
   elements.answerContent.classList.remove("answer-reveal");
   void elements.answerContent.offsetWidth;
@@ -764,10 +770,11 @@ function onTrackKeyDown(event) {
 }
 
 function openBook(openingMethod) {
-  if (state.isOpen) return;
+  if (state.isOpen || elements.book.dataset.state === "closing") return;
   state.openingMethod = openingMethod;
   state.isOpen = true;
   resetFlip();
+  setNavigatorVisible(false);
 
   const startingIndex = openingMethod === "swipe" ? -1 : randomIndex();
   showAnswer(startingIndex, { animate: false });
@@ -776,6 +783,7 @@ function openBook(openingMethod) {
   elements.openBook.setAttribute("aria-hidden", "false");
   elements.openActions.hidden = false;
   elements.openActions.style.display = "flex";
+  elements.openActions.classList.remove("is-visible");
   elements.statusText.hidden = true;
 
   if (openingMethod === "random") {
@@ -794,12 +802,15 @@ function openBook(openingMethod) {
   setTimeout(() => {
     if (state.isOpen) {
       elements.book.dataset.state = "open";
+      setNavigatorVisible(true);
+      elements.openActions.classList.add("is-visible");
       revealAnswer();
     }
   }, 900);
 }
 
 function closeBook() {
+  if (!state.isOpen) return;
   state.isOpen = false;
   state.openingMethod = null;
   state.navigationToken += 1;
@@ -811,16 +822,24 @@ function closeBook() {
   state.isAnimating = false;
   resetFlip();
   resetThickBlock();
-  elements.book.dataset.state = "closed";
-  elements.openBook.setAttribute("aria-hidden", "true");
+  elements.book.dataset.state = "closing";
   elements.openBook.classList.remove("is-seeking", "is-page-swipe-ready");
   elements.pageNavigator.classList.remove("is-scrubbing", "is-turning");
+  setNavigatorVisible(false);
   elements.pageTrackInstruction.textContent = "打开书后可滑动或轻点";
-  elements.openActions.hidden = true;
-  elements.openActions.style.display = "";
-  elements.statusText.hidden = false;
+  elements.openActions.classList.remove("is-visible");
+  elements.statusText.hidden = true;
   elements.statusText.textContent = "轻触随机开启 · 向左滑动从 000 开始";
   playCloseSound();
+
+  setTimeout(() => {
+    if (state.isOpen || elements.book.dataset.state !== "closing") return;
+    elements.book.dataset.state = "closed";
+    elements.openBook.setAttribute("aria-hidden", "true");
+    elements.openActions.hidden = true;
+    elements.openActions.style.display = "";
+    elements.statusText.hidden = false;
+  }, 720);
 }
 
 async function turnOnePage(direction) {
@@ -1063,10 +1082,7 @@ async function init() {
     }
     state.answers = answerBook.answers;
     updateNavigator(-1);
-    elements.pageNavigator.hidden = false;
-    requestAnimationFrame(() => {
-      elements.pageNavigator.classList.add("is-visible");
-    });
+    setNavigatorVisible(false);
 
     elements.coverButton.addEventListener("pointerdown", onCoverPointerDown);
     elements.coverButton.addEventListener("pointermove", onCoverPointerMove);

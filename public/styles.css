@@ -159,10 +159,14 @@ button {
   filter: blur(30px);
   opacity: 0.72;
   transform: translate(-50%, -50%) scaleX(0.55);
-  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 720ms ease,
+    transform 780ms cubic-bezier(0.42, 0, 0.2, 1);
 }
 
+.book-scene:has(.book[data-state="opening"]) .book-shadow,
 .book-scene:has(.book[data-state="open"]) .book-shadow {
+  opacity: 0.78;
   transform: translate(-50%, -50%) scaleX(1);
 }
 
@@ -172,9 +176,9 @@ button {
   height: var(--book-h);
   transform-style: preserve-3d;
   transition:
-    width 900ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 900ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+    width 760ms cubic-bezier(0.42, 0, 0.2, 1),
+    height 760ms cubic-bezier(0.42, 0, 0.2, 1),
+    transform 760ms cubic-bezier(0.42, 0, 0.2, 1);
 }
 
 .book[data-state="closed"] {
@@ -187,6 +191,41 @@ button {
   height: min(58vw, 488px);
   min-height: 320px;
   transform: translateY(4px);
+}
+
+.book[data-state="opening"] {
+  animation: book-open-settle 900ms cubic-bezier(0.42, 0, 0.2, 1) both;
+}
+
+.book[data-state="closing"] {
+  animation: book-close-settle 720ms cubic-bezier(0.42, 0, 0.2, 1) both;
+}
+
+@keyframes book-open-settle {
+  0% {
+    transform: translateY(0) rotateX(3deg) rotateY(-3deg);
+  }
+  18% {
+    transform: translateY(-5px) rotateX(2deg) rotateY(-1.5deg);
+  }
+  78% {
+    transform: translateY(5px) rotateX(1deg) rotateY(0deg);
+  }
+  100% {
+    transform: translateY(4px) rotateX(0deg) rotateY(0deg);
+  }
+}
+
+@keyframes book-close-settle {
+  0% {
+    transform: translateY(4px) rotateX(0deg) rotateY(0deg);
+  }
+  82% {
+    transform: translateY(-2px) rotateX(2deg) rotateY(-2deg);
+  }
+  100% {
+    transform: translateY(0) rotateX(3deg) rotateY(-4deg);
+  }
 }
 
 @keyframes book-breathe {
@@ -208,11 +247,19 @@ button {
 }
 
 .closed-book {
+  right: auto;
+  bottom: auto;
+  top: 50%;
+  left: 50%;
+  width: var(--book-w);
+  height: var(--book-h);
   transform-style: preserve-3d;
   filter: drop-shadow(0 24px 24px rgba(0, 0, 0, 0.34));
+  transform: translate(-50%, -50%);
+  transform-origin: right center;
   transition:
-    opacity 400ms ease,
-    transform 850ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 180ms ease,
+    transform 720ms cubic-bezier(0.42, 0, 0.2, 1);
 }
 
 .page-block {
@@ -366,7 +413,22 @@ button {
 .book[data-state="open"] .closed-book {
   pointer-events: none;
   opacity: 0;
-  transform: translateX(-25%) rotateY(-125deg) scale(0.72);
+  transform: translate(-100%, -50%) rotateY(-158deg) scale(0.94);
+}
+
+.book[data-state="opening"] .closed-book {
+  transition:
+    opacity 170ms ease 520ms,
+    transform 760ms cubic-bezier(0.42, 0, 0.2, 1);
+}
+
+.book[data-state="closing"] .closed-book {
+  pointer-events: none;
+  opacity: 1;
+  transform: translate(-50%, -50%);
+  transition:
+    opacity 190ms ease 220ms,
+    transform 680ms cubic-bezier(0.42, 0, 0.2, 1);
 }
 
 .open-book {
@@ -381,14 +443,14 @@ button {
   visibility: hidden;
   opacity: 0;
   filter: drop-shadow(0 27px 24px rgba(0, 0, 0, 0.38));
-  transform: rotateX(14deg) scale(0.72);
+  transform: rotateX(9deg) scale(0.92);
   transform-style: preserve-3d;
   touch-action: pan-y;
   user-select: none;
   transition:
-    opacity 600ms ease 180ms,
-    transform 900ms cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 900ms;
+    opacity 240ms ease,
+    transform 760ms cubic-bezier(0.42, 0, 0.2, 1),
+    visibility 0s linear 760ms;
 }
 
 .open-book::before {
@@ -409,7 +471,17 @@ button {
   visibility: visible;
   opacity: 1;
   transform: rotateX(2deg) scale(1);
-  transition-delay: 120ms, 0ms, 0ms;
+  transition-delay: 250ms, 80ms, 0ms;
+}
+
+.book[data-state="closing"] .open-book {
+  visibility: visible;
+  opacity: 0;
+  transform: rotateX(9deg) scale(0.92);
+  transition:
+    opacity 170ms ease 70ms,
+    transform 650ms cubic-bezier(0.42, 0, 0.2, 1),
+    visibility 0s linear 720ms;
 }
 
 .paper {
@@ -995,6 +1067,19 @@ button {
   filter: blur(6px);
 }
 
+.left-content {
+  transition:
+    opacity 260ms ease,
+    filter 260ms ease;
+}
+
+.book[data-state="opening"] .left-content,
+.book[data-state="closing"] .left-content,
+.book[data-state="closing"] .answer-content {
+  opacity: 0;
+  filter: blur(4px);
+}
+
 .open-book.is-page-swipe-ready {
   cursor: grabbing;
 }
@@ -1031,16 +1116,17 @@ button {
 
 .page-navigator {
   width: min(76vw, 560px);
+  visibility: hidden;
   opacity: 0;
-  transform: translateY(8px);
   transition:
-    opacity 420ms ease,
-    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 260ms ease,
+    visibility 0s linear 260ms;
 }
 
 .page-navigator.is-visible {
+  visibility: visible;
   opacity: 1;
-  transform: none;
+  transition-delay: 0ms;
 }
 
 .page-track {
@@ -1285,6 +1371,12 @@ button {
 .open-actions {
   align-items: center;
   gap: 15px;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.open-actions.is-visible {
+  opacity: 1;
 }
 
 .text-button {
