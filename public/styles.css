@@ -988,8 +988,9 @@ button {
   }
 }
 
-.answer-content.answer-change {
-  animation: answer-arrive 380ms ease-out;
+.book[data-state="opening"] .answer-content {
+  opacity: 0;
+  filter: blur(6px);
 }
 
 .open-book.is-seeking .answer-content,
@@ -998,37 +999,28 @@ button {
   filter: blur(5px);
 }
 
+.answer-content.answer-change,
 .answer-content.answer-reveal {
-  animation: answer-reveal 1050ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: answer-fade-in 900ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes answer-arrive {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-    filter: blur(3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-}
-
-@keyframes answer-reveal {
+@keyframes answer-fade-in {
   0% {
     opacity: 0;
-    filter: blur(9px);
-    transform: translateY(11px) scale(0.985);
+    filter: blur(7px);
   }
-  45% {
-    opacity: 0.34;
+  48% {
+    opacity: 0.42;
   }
   100% {
     opacity: 1;
     filter: none;
-    transform: none;
   }
+}
+
+.front-cover.is-swipe-ready {
+  filter: brightness(1.06);
+  transform: translateX(-11px) rotateY(-5deg) translateZ(5px);
 }
 
 .page-navigator {
@@ -1419,10 +1411,6 @@ button {
     font-size: 10px;
   }
 
-  .front-cover.is-swipe-ready {
-    filter: brightness(1.06);
-    transform: translateX(-11px) rotateY(-5deg) translateZ(5px);
-  }
 }
 
 @media (max-height: 670px) {

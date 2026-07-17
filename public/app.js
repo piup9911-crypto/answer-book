@@ -261,29 +261,19 @@ async function animateLeafTurn(direction, duration) {
     [
       {
         transform: "rotateY(0deg) rotateZ(0deg) translateZ(2px) scaleX(1)",
-        offset: 0,
-        easing: "cubic-bezier(0.32, 0, 0.64, 1)"
+        offset: 0
       },
       {
         transform:
-          `rotateY(${sign * 58}deg) rotateZ(${sign * 0.7}deg) ` +
+          `rotateY(${sign * 60}deg) rotateZ(${sign * 0.7}deg) ` +
           "translateZ(9px) scaleX(0.992)",
-        offset: 0.34,
-        easing: "cubic-bezier(0.26, 0.02, 0.54, 1)"
+        offset: 0.333
       },
       {
         transform:
-          `rotateY(${sign * 118}deg) rotateZ(${sign * -0.38}deg) ` +
+          `rotateY(${sign * 120}deg) rotateZ(${sign * -0.38}deg) ` +
           "translateZ(15px) scaleX(0.973)",
-        offset: 0.67,
-        easing: "cubic-bezier(0.3, 0, 0.48, 1)"
-      },
-      {
-        transform:
-          `rotateY(${sign * 184}deg) rotateZ(${sign * 0.18}deg) ` +
-          "translateZ(5px) scaleX(0.992)",
-        offset: 0.93,
-        easing: "ease-out"
+        offset: 0.667
       },
       {
         transform:
@@ -293,7 +283,8 @@ async function animateLeafTurn(direction, duration) {
     ],
     {
       duration,
-      fill: "forwards"
+      fill: "forwards",
+      easing: "linear"
     }
   );
 
@@ -318,7 +309,6 @@ async function runAutomaticFlip(
   { quiet = false } = {}
 ) {
   prepareFlip(direction, targetIndex);
-  await wait(32);
   await animatePreparedFlip(true, duration, { quiet });
 }
 
@@ -394,8 +384,7 @@ async function navigateWithLeaves(target, navigationToken) {
       );
     }
 
-    const edgeSlowdown = step === 1 || step === flipCount ? 45 : 0;
-    const duration = Math.max(105, 172 - flipCount * 3) + edgeSlowdown;
+    const duration = Math.max(118, 160 - flipCount * 2);
 
     await runAutomaticFlip(
       direction,
@@ -403,7 +392,6 @@ async function navigateWithLeaves(target, navigationToken) {
       duration,
       { quiet: step !== flipCount }
     );
-    if (step !== flipCount) await wait(18);
   }
 
   return true;
@@ -563,7 +551,7 @@ async function navigateWithPageBlock(target, navigationToken) {
   const depth = 12 + Math.min(22, 8 + distanceRatio * 28);
   const duration = 920 + Math.round(distanceRatio * 260);
   const angle = direction > 0 ? -180 : 180;
-  const uprightAngle = direction > 0 ? -88 : 88;
+  const uprightAngle = angle * 0.48;
   const firstPhase = Math.round(duration * 0.48);
   const secondPhase = duration - firstPhase;
 
@@ -582,12 +570,12 @@ async function navigateWithPageBlock(target, navigationToken) {
   elements.thickPageBlock.style.transform = "rotateY(0deg) translateZ(4px)";
   void elements.thickPageBlock.offsetWidth;
   elements.thickPageBlock.style.transition =
-    `transform ${firstPhase}ms cubic-bezier(0.34, 0.02, 0.58, 1)`;
+    `transform ${firstPhase}ms linear`;
   elements.thickPageBlock.style.transform =
     `rotateY(${uprightAngle}deg) rotateZ(${direction * -0.35}deg) translateZ(12px)`;
   const liftLayerAnimations = animateBlockLayers(
     direction,
-    firstPhase + 55,
+    firstPhase,
     "lift"
   );
   const liftShadowAnimation = elements.bookShadow.animate(
@@ -603,7 +591,7 @@ async function navigateWithPageBlock(target, navigationToken) {
   );
   playBlockSound(depth);
 
-  await wait(firstPhase + 55);
+  await wait(firstPhase);
   if (
     navigationToken !== state.navigationToken ||
     !state.isOpen
@@ -618,12 +606,12 @@ async function navigateWithPageBlock(target, navigationToken) {
   liftShadowAnimation.cancel();
 
   elements.thickPageBlock.style.transition =
-    `transform ${secondPhase}ms cubic-bezier(0.38, 0, 0.22, 1)`;
+    `transform ${secondPhase}ms linear`;
   elements.thickPageBlock.style.transform =
     `rotateY(${angle}deg) rotateZ(${direction * 0.12}deg) translateZ(4px)`;
   const settleLayerAnimations = animateBlockLayers(
     direction,
-    secondPhase + 90,
+    secondPhase,
     "settle"
   );
   const settleShadowAnimation = elements.bookShadow.animate(
@@ -633,12 +621,12 @@ async function navigateWithPageBlock(target, navigationToken) {
       { transform: "translate(-50%, -50%) scaleX(1)", opacity: 0.72 }
     ],
     {
-      duration: secondPhase + 160,
+      duration: secondPhase,
       easing: "ease-out"
     }
   );
 
-  await wait(secondPhase + 48);
+  await wait(secondPhase);
   await animateBookLanding(direction);
   settleShadowAnimation.cancel();
   for (const animation of [
@@ -804,7 +792,10 @@ function openBook(mode) {
 
   playOpenSound();
   setTimeout(() => {
-    if (state.isOpen) elements.book.dataset.state = "open";
+    if (state.isOpen) {
+      elements.book.dataset.state = "open";
+      revealAnswer();
+    }
   }, 900);
 }
 
@@ -833,13 +824,6 @@ async function turnOnePage(direction) {
   void navigateToIndex(state.currentIndex + direction, { interaction: "drag" });
 }
 
-function isMobileBookInteraction() {
-  return (
-    window.matchMedia("(pointer: coarse)").matches ||
-    window.innerWidth <= 820
-  );
-}
-
 function onCoverPointerDown(event) {
   if (state.isOpen || state.coverPointerId !== null) return;
   state.coverPointerId = event.pointerId;
@@ -857,7 +841,6 @@ function onCoverPointerMove(event) {
     state.coverPointerMoved = true;
   }
   const isLeftSwipe =
-    isMobileBookInteraction() &&
     deltaX <= -28 &&
     Math.abs(deltaX) > Math.abs(deltaY) * 1.15;
   elements.coverButton.classList.toggle("is-swipe-ready", isLeftSwipe);
@@ -875,7 +858,6 @@ function onCoverPointerEnd(event) {
   const deltaY = event.clientY - state.coverPointerStartY;
   const shouldOpenSwipeMode =
     event.type !== "pointercancel" &&
-    isMobileBookInteraction() &&
     deltaX <= -48 &&
     Math.abs(deltaX) > Math.abs(deltaY) * 1.2;
 
