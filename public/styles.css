@@ -417,28 +417,11 @@ button {
     0 0 22px rgba(226, 199, 143, 0.15);
 }
 
-.cover-owner {
-  margin-top: 14px;
-  color: rgba(232, 212, 170, 0.68);
-  font-size: 13px;
-  letter-spacing: 0.5em;
-  text-indent: 0.5em;
-}
-
 .cover-rule {
   width: 50px;
   height: 1px;
   margin-top: 29px;
   background: linear-gradient(90deg, transparent, var(--gold), transparent);
-}
-
-.cover-hint {
-  position: absolute;
-  bottom: 43px;
-  color: rgba(232, 212, 170, 0.45);
-  font-family: "Microsoft YaHei", sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.18em;
 }
 
 .book[data-state="opening"] .closed-book,
@@ -1238,34 +1221,6 @@ button {
     0 0 24px rgba(226, 199, 143, 0.52);
 }
 
-.page-track-preview {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  min-width: 43px;
-  padding: 5px 8px;
-  border: 1px solid rgba(202, 168, 106, 0.22);
-  border-radius: 6px;
-  background: rgba(9, 16, 27, 0.88);
-  color: var(--gold-bright);
-  font-family: "Times New Roman", serif;
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  text-align: center;
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, 4px);
-  transition:
-    opacity 180ms ease,
-    transform 180ms ease;
-}
-
-.page-navigator.is-scrubbing .page-track-preview,
-.page-navigator.is-turning .page-track-preview {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
 .page-track-meta {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -1583,9 +1538,6 @@ button {
     margin-top: 0;
   }
 
-  .cover-hint {
-    bottom: 34px;
-  }
 }
 
 @media (max-width: 700px) and (max-height: 670px) {

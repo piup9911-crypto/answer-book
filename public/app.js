@@ -17,7 +17,6 @@ const elements = {
   pageTrack: document.querySelector("#pageTrack"),
   pageTrackFill: document.querySelector("#pageTrackFill"),
   pageTrackInstruction: document.querySelector("#pageTrackInstruction"),
-  pageTrackPreview: document.querySelector("#pageTrackPreview"),
   pageTrackThumb: document.querySelector("#pageTrackThumb"),
   questionCopy: document.querySelector("#questionCopy"),
   againButton: document.querySelector("#againButton"),
@@ -99,7 +98,7 @@ function paintAnswer(answer, textNode, numberNode, pageNode) {
   const label = pageLabel(answer);
 
   textNode.textContent = answer.text;
-  numberNode.textContent = `ANSWER · ${label}`;
+  numberNode.textContent = "ANSWER";
   pageNode.textContent = label;
 }
 
@@ -327,7 +326,6 @@ function updateNavigator(index) {
   const label = indexLabel(boundedIndex);
 
   elements.pageNavigator.style.setProperty("--page-position", `${percent}%`);
-  elements.pageTrackPreview.textContent = label;
   elements.pageTrack.setAttribute("aria-valuenow", String(boundedIndex + 1));
   elements.pageTrack.setAttribute("aria-valuetext", `第 ${label} 页`);
   state.scrubTargetIndex = boundedIndex;
