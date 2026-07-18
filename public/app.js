@@ -23,6 +23,9 @@ const elements = {
   soundButton: document.querySelector("#soundButton"),
   soundLabel: document.querySelector("#soundLabel"),
   statusText: document.querySelector("#statusText"),
+  themeButton: document.querySelector("#themeButton"),
+  themeColor: document.querySelector("#themeColor"),
+  themeLabel: document.querySelector("#themeLabel"),
   thickPageBlock: document.querySelector("#thickPageBlock"),
   sheetBackAnswer: document.querySelector("#sheetBackAnswer"),
   sheetBackNumber: document.querySelector("#sheetBackNumber"),
@@ -63,6 +66,46 @@ const state = {
   trackPointerMoved: false,
   soundEnabled: true
 };
+
+const THEME_STORAGE_KEY = "aqi-answer-book-theme";
+
+function readStoredTheme() {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === "forest"
+      ? "forest"
+      : "classic";
+  } catch {
+    return "classic";
+  }
+}
+
+function applyTheme(theme, { persist = false } = {}) {
+  const nextTheme = theme === "forest" ? "forest" : "classic";
+  const isForest = nextTheme === "forest";
+  document.documentElement.dataset.theme = nextTheme;
+  elements.themeButton.setAttribute("aria-pressed", String(isForest));
+  elements.themeButton.setAttribute(
+    "aria-label",
+    isForest ? "切换至原典主题" : "切换至森境主题"
+  );
+  elements.themeLabel.textContent = isForest ? "森境" : "原典";
+  elements.themeColor.setAttribute("content", isForest ? "#04110d" : "#111b2b");
+
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch {
+      // The theme still applies for this visit when storage is unavailable.
+    }
+  }
+}
+
+function toggleTheme() {
+  const nextTheme =
+    document.documentElement.dataset.theme === "forest" ? "classic" : "forest";
+  applyTheme(nextTheme, { persist: true });
+  if (state.soundEnabled) playTapSound();
+}
 
 function randomIndex() {
   const answerCount = state.answers.length;
@@ -1070,6 +1113,7 @@ function showError(message) {
 
 async function init() {
   try {
+    applyTheme(readStoredTheme());
     const response = await fetch("/data/aqi-answer-book.json", { cache: "no-store" });
     if (!response.ok) throw new Error(`答案数据加载失败（${response.status}）`);
     const answerBook = await response.json();
@@ -1092,6 +1136,7 @@ async function init() {
     elements.book.addEventListener("click", onOpenBookClick);
     elements.closeButton.addEventListener("click", closeBook);
     elements.soundButton.addEventListener("click", toggleSound);
+    elements.themeButton.addEventListener("click", toggleTheme);
     elements.againButton.addEventListener("click", () => {
       if (state.openingMethod === "random") {
         showAnswer(randomIndex());

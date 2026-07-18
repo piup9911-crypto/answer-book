@@ -3,17 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#111b2b" />
+    <meta name="theme-color" id="themeColor" content="#111b2b" />
     <meta
       name="description"
       content="阿祈的答案之书——触碰开启，或滑动书页，在停下的地方遇见答案。"
     />
     <title>阿祈的答案之书</title>
-    <link rel="stylesheet" href="/styles.css?v=14" />
-    <script type="module" src="/app.js?v=14"></script>
+    <link rel="stylesheet" href="/styles.css?v=18" />
+    <script type="module" src="/app.js?v=18"></script>
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
+      <img class="forest-backdrop" src="/assets/forest-backdrop.webp" alt="" />
+      <div class="fireflies">
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+      </div>
       <span class="glow glow-one"></span>
       <span class="glow glow-two"></span>
       <span class="grain"></span>
@@ -22,10 +34,21 @@
     <main class="app">
       <header class="masthead">
         <p class="eyebrow">A BOOK FOR YOUR QUESTION</p>
-        <button class="sound-button" id="soundButton" type="button" aria-pressed="true">
-          <span class="sound-dot" aria-hidden="true"></span>
-          <span id="soundLabel">声音开</span>
-        </button>
+        <div class="masthead-actions">
+          <button
+            class="theme-button"
+            id="themeButton"
+            type="button"
+            aria-pressed="false"
+            aria-label="切换至森境主题"
+          >
+            <span class="theme-label" id="themeLabel">原典</span>
+          </button>
+          <button class="sound-button" id="soundButton" type="button" aria-pressed="true">
+            <span class="sound-dot" aria-hidden="true"></span>
+            <span id="soundLabel">声音开</span>
+          </button>
+        </div>
       </header>
 
       <section class="book-scene" id="bookScene" aria-live="polite">
