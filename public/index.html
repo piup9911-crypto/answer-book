@@ -9,8 +9,8 @@
       content="阿祈的答案之书——触碰开启，或滑动书页，在停下的地方遇见答案。"
     />
     <title>阿祈的答案之书</title>
-    <link rel="stylesheet" href="/styles.css?v=12" />
-    <script type="module" src="/app.js?v=12"></script>
+    <link rel="stylesheet" href="/styles.css?v=13" />
+    <script type="module" src="/app.js?v=13"></script>
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
@@ -33,30 +33,7 @@
 
         <div class="book-stage">
           <div class="book" id="book" data-state="closed">
-          <div class="closed-book" id="closedBook">
-            <div class="page-block" aria-hidden="true"></div>
-            <button
-              class="front-cover"
-              id="coverButton"
-              type="button"
-              aria-label="轻触随机打开，或向左滑动从第零页打开"
-            >
-              <span class="cover-border cover-border-outer"></span>
-              <span class="cover-border cover-border-inner"></span>
-              <span class="corner corner-tl"></span>
-              <span class="corner corner-tr"></span>
-              <span class="corner corner-bl"></span>
-              <span class="corner corner-br"></span>
-              <span class="cover-star" aria-hidden="true">✦</span>
-              <span class="cover-kicker">THE BOOK OF</span>
-              <span class="cover-title">答案之书</span>
-              <span class="cover-owner">阿祈</span>
-              <span class="cover-rule"></span>
-              <span class="cover-hint">轻触随机开启 · 左滑从零页开启</span>
-            </button>
-          </div>
-
-          <div class="open-book" id="openBook" aria-hidden="true">
+          <div class="open-book" id="openBook">
             <div class="page-stack page-stack-left" id="leftPageStack" aria-hidden="true"></div>
             <div class="page-stack page-stack-right" id="rightPageStack" aria-hidden="true"></div>
             <div class="book-spine" aria-hidden="true"></div>
@@ -137,6 +114,35 @@
                 <span class="block-bend-slice"></span>
                 <span class="block-bend-slice"></span>
                 <span class="block-bend-slice"></span>
+              </div>
+            </div>
+
+            <div class="closed-book" id="closedBook">
+              <div class="page-block" aria-hidden="true"></div>
+              <div class="cover-leaf">
+                <button
+                  class="front-cover"
+                  id="coverButton"
+                  type="button"
+                  aria-label="轻触随机打开，或向左滑动从第零页打开"
+                >
+                  <span class="cover-border cover-border-outer"></span>
+                  <span class="cover-border cover-border-inner"></span>
+                  <span class="corner corner-tl"></span>
+                  <span class="corner corner-tr"></span>
+                  <span class="corner corner-bl"></span>
+                  <span class="corner corner-br"></span>
+                  <span class="cover-star" aria-hidden="true">✦</span>
+                  <span class="cover-kicker">THE BOOK OF</span>
+                  <span class="cover-title">答案之书</span>
+                  <span class="cover-owner">阿祈</span>
+                  <span class="cover-rule"></span>
+                  <span class="cover-hint">轻触随机开启 · 左滑从零页开启</span>
+                </button>
+                <div class="cover-inside" aria-hidden="true">
+                  <div class="paper-noise"></div>
+                  <span class="inside-mark">AQI</span>
+                </div>
               </div>
             </div>
           </div>

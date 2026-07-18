@@ -780,7 +780,6 @@ function openBook(openingMethod) {
   showAnswer(startingIndex, { animate: false });
 
   elements.book.dataset.state = "opening";
-  elements.openBook.setAttribute("aria-hidden", "false");
   elements.openActions.hidden = false;
   elements.openActions.style.display = "flex";
   elements.openActions.classList.remove("is-visible");
@@ -835,7 +834,6 @@ function closeBook() {
   setTimeout(() => {
     if (state.isOpen || elements.book.dataset.state !== "closing") return;
     elements.book.dataset.state = "closed";
-    elements.openBook.setAttribute("aria-hidden", "true");
     elements.openActions.hidden = true;
     elements.openActions.style.display = "";
     elements.statusText.hidden = false;
