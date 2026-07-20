@@ -1,21 +1,27 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="forest">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" id="themeColor" content="#111b2b" />
+    <meta name="theme-color" id="themeColor" content="#04110d" />
     <meta
       name="description"
       content="阿祈的答案之书——触碰开启，或滑动书页，在停下的地方遇见答案。"
     />
     <title>阿祈的答案之书</title>
-    <link rel="stylesheet" href="/styles.css?v=18" />
-    <script type="module" src="/app.js?v=18"></script>
+    <link rel="stylesheet" href="/styles.css?v=34" />
+    <script type="module" src="/app.js?v=34"></script>
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
       <img class="forest-backdrop" src="/assets/forest-backdrop.webp" alt="" />
       <div class="fireflies">
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
+        <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
         <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
         <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
         <img class="firefly" src="/assets/firefly-glow.webp" alt="" />
@@ -35,17 +41,44 @@
       <header class="masthead">
         <p class="eyebrow">A BOOK FOR YOUR QUESTION</p>
         <div class="masthead-actions">
+          <span class="guide-entry">
+            <button
+              class="guide-button"
+              id="guideButton"
+              type="button"
+              aria-label="打开操作指南"
+            >
+              <span class="control-icon control-icon-guide" aria-hidden="true"></span>
+              <span>指南</span>
+            </button>
+            <button
+              class="guide-replay-hint"
+              id="guideReplayHint"
+              type="button"
+              hidden
+            >
+              <span class="guide-replay-arrow" aria-hidden="true"></span>
+              <span>以后可以从这里再次打开指南</span>
+            </button>
+          </span>
           <button
             class="theme-button"
             id="themeButton"
             type="button"
-            aria-pressed="false"
-            aria-label="切换至森境主题"
+            aria-pressed="true"
+            aria-label="切换至原典主题"
           >
-            <span class="theme-label" id="themeLabel">原典</span>
+            <span class="control-icon control-icon-theme" aria-hidden="true"></span>
+            <span class="theme-label" id="themeLabel">森境</span>
           </button>
-          <button class="sound-button" id="soundButton" type="button" aria-pressed="true">
-            <span class="sound-dot" aria-hidden="true"></span>
+          <button
+            class="sound-button"
+            id="soundButton"
+            type="button"
+            aria-pressed="true"
+            aria-label="关闭声音"
+          >
+            <span class="control-icon control-icon-sound" aria-hidden="true"></span>
             <span id="soundLabel">声音开</span>
           </button>
         </div>
@@ -169,6 +202,15 @@
           </div>
           </div>
 
+          <div class="entry-mode-hint browse-mode-hint" id="browseModeHint" role="status" hidden>
+            <span class="browse-mode-hint-icon" aria-hidden="true"></span>
+            <span>还可以向左滑动封面，从第 000 页开始翻阅</span>
+          </div>
+          <div class="entry-mode-hint random-mode-hint" id="randomModeHint" role="status" hidden>
+            <span class="random-mode-hint-icon" aria-hidden="true"></span>
+            <span>也可以轻触封面，随机打开一个答案</span>
+          </div>
+
           <div class="page-navigator" id="pageNavigator" aria-hidden="true" inert>
             <div
               class="page-track"
@@ -207,6 +249,39 @@
     <div class="loading-screen" id="loadingScreen">
       <span class="loading-star">✦</span>
       <p>正在整理书页</p>
+    </div>
+
+    <div class="guide-layer" id="guideLayer" hidden>
+      <div class="guide-focus" id="guideFocus" aria-hidden="true"></div>
+      <section
+        class="guide-card"
+        id="guideCard"
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="guideTitle"
+        aria-describedby="guideCopy"
+      >
+        <p class="guide-step" id="guideStep">01 / 03</p>
+        <h2 class="guide-title" id="guideTitle"></h2>
+        <p class="guide-copy" id="guideCopy"></p>
+        <div class="guide-visual" aria-hidden="true">
+          <span class="guide-cue guide-cue-primary" id="guideCuePrimary">
+            <span class="guide-cue-icon" id="guideCuePrimaryIcon"></span>
+            <span class="guide-cue-label" id="guideCuePrimaryLabel"></span>
+          </span>
+          <span class="guide-cue-separator"></span>
+          <span class="guide-cue guide-cue-secondary" id="guideCueSecondary">
+            <span class="guide-cue-icon" id="guideCueSecondaryIcon"></span>
+            <span class="guide-cue-label" id="guideCueSecondaryLabel"></span>
+          </span>
+        </div>
+        <div class="guide-actions">
+          <button class="guide-skip" id="guideSkip" type="button">跳过</button>
+          <button class="guide-continue" id="guideContinue" type="button" hidden>
+            继续
+          </button>
+        </div>
+      </section>
     </div>
 
     <div class="error-toast" id="errorToast" role="alert" hidden></div>

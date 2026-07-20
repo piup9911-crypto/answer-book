@@ -3,3 +3,5 @@ node_modules/
 .dev.vars
 .dev-server.pid
 *.log
+.tmp-tabler/
+.qa-*.png
