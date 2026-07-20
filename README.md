@@ -1,15 +1,22 @@
 # 答案之书
 
-部署在 [`answer-book.naginoumi.com`](https://answer-book.naginoumi.com/) 的独立互动答案之书，答案数据来自 `public/data/aqi-answer-book.json`，目前共 412 条。
+一本可以轻触随机开启、滑动逐页翻阅的互动答案之书。
+
+- 免费生产地址：[`answers-within.cloudiday.workers.dev`](https://answers-within.cloudiday.workers.dev/)
+- 保留的自定义域名：[`answer-book.naginoumi.com`](https://answer-book.naginoumi.com/)
+- GitHub 仓库：[`piup9911-crypto/answer-book`](https://github.com/piup9911-crypto/answer-book)
+- 答案数据：[`public/data/aqi-answer-book.json`](public/data/aqi-answer-book.json)，目前共 412 条。
 
 ## 当前项目状态
 
-- 生产主版使用 CSS 书体与 DOM 文字，优先保证纸面细节、文字清晰度和手机端性能。
+- 生产主版使用 CSS 3D 书体、独立书页纹理与 DOM 文字，优先保证纸面细节、文字清晰度和手机端性能。
 - 答案使用 `crypto.getRandomValues()` 等概率抽取，允许自然重复。
 - 滑动模式支持页数进度条：拖动时逐页翻动，点击时翻动一叠厚页。
-- 项目由 Cloudflare Worker Static Assets 部署，自定义域名为 `answer-book.naginoumi.com`。
-- Three.js 3D 实验保存在 `codex/three-experiment` 分支，并发布在独立预览地址：
-  [`three-experiment-aqi-answer-book.piup9911.workers.dev`](https://three-experiment-aqi-answer-book.piup9911.workers.dev/)
+- 项目由 Cloudflare Worker Static Assets 部署，Worker 名称为 `answers-within`，账户子域名为 `cloudiday.workers.dev`。
+- 默认主题为“森境”；“原典”主题继续保留，可在页面右上角即时切换。
+- 页面包含首次使用指南，并会根据用户采用轻触打开或滑动打开的方式，分阶段提示另一种操作，不强制完成全部手势。
+- 当前森林主题使用完整的绿色皮革封面、金色植物纹框、左右镜像羊皮纸书页、森林背景与萤火素材。
+- Three.js 3D 实验仍保存在 `codex/three-experiment` 分支，作为后续技术参考；原实验预览地址已不再作为当前生产入口。
 - Three.js 实验验证了实时柔性翻页，但当前存在材质偏旧、近距离网格感明显、动态文字纹理不够清晰等问题，因此没有作为生产主版。
 
 ## 后期视觉优化方向
@@ -30,12 +37,13 @@
 - 翻页过程中隐藏文字，书页停稳后再由 DOM 文字贴合纸面浮现。
 - 可以保留 CSS 主版的清晰交互，同时获得 Blender 的材质与光影质感。
 
-在新方案达到目标前，生产主版与各实验预览应并行保留，不直接互相覆盖。
+在新方案达到目标前，生产主版与实验分支应并行保留，不直接互相覆盖。
 
 ## 当前交互
 
 - 右上角主题按钮可在“原典”与“森境”之间即时切换；选择保存在浏览器本地，切换时不会重置答案、书本状态或翻页进度。
-- “森境”使用独立的森林背景、萤火、树形水印与星座纹饰素材；“原典”样式继续完整保留，方便并行比较和继续探索。
+- “森境”使用独立的森林背景、萤火、绿色皮革封面与左右镜像书页素材；“原典”样式继续完整保留，方便并行比较和继续探索。
+- 首次使用时会显示可视化操作指南；完成基础操作后，仍可在右上角通过“指南”重新打开。
 - 电脑与手机：轻点闭合书封随机打开；轻点摊开的书合上；再次轻点书封重新随机打开。
 - 电脑使用鼠标、手机使用手指在闭合书封上从右向左拖动，从第 `000` 页打开。
 - 页数轨道只在书本完全摊开后显示；无论以哪种方式打开，都可拖动轨道连续逐页翻动，或点击轨道翻动一叠厚页。
@@ -43,6 +51,16 @@
 - 两种打开方式的答案都在原位由模糊到清晰浮现，不产生上下位移。
 - 开合动画以书脊为视觉锚点：打开时先抬起和展开纸页，落稳后显示文字与轨道；关闭时先隐藏内容，再收拢纸页和封面。
 - 封面、内封、纸块、书脊与摊开书页共用同一套 3D 坐标，不再通过两套书体重叠淡化，避免开合过程穿模。
+
+## 修改答案
+
+答案文字保存在：
+
+```text
+public/data/aqi-answer-book.json
+```
+
+修改后运行 `npm run check`。检查脚本会验证 JSON 结构、答案数量、页码与重复 ID，避免格式错误进入部署版本。
 
 ## 本地运行
 
