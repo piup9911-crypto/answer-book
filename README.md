@@ -1,4 +1,4 @@
-# 阿祈的答案之书
+# 答案之书
 
 部署在 [`answer-book.naginoumi.com`](https://answer-book.naginoumi.com/) 的独立互动答案之书，答案数据来自 `public/data/aqi-answer-book.json`，目前共 412 条。
 
